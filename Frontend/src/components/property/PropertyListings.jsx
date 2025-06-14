@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom'; // ADD this import
 import {
   Typography,
   Box,
@@ -39,16 +40,54 @@ import {
 } from './utils/PropertyUtils';
 
 const PropertyListings = () => {
-  // State management
+  // ADD this line for URL state management
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ADD helper function to get filters from URL
+  const getFiltersFromURL = () => {
+    return {
+      searchText: searchParams.get('search') || '',
+      city: searchParams.get('city') || 'all',
+      type: searchParams.get('type') || 'all',
+      subtype: searchParams.get('subtype') || 'all',
+      minPrice: searchParams.get('minPrice') || '',
+      maxPrice: searchParams.get('maxPrice') || '',
+      minArea: searchParams.get('minArea') || '',
+      maxArea: searchParams.get('maxArea') || '',
+    };
+  };
+
+  // ADD helper function to update URL
+  const updateURL = (newFilters) => {
+    const params = new URLSearchParams();
+    
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (value && value !== 'all' && value !== '') {
+        params.set(key === 'searchText' ? 'search' : key, value);
+      }
+    });
+    
+    setSearchParams(params, { replace: true });
+  };
+
+  // MODIFIED state initialization to check URL first
   const [properties, setProperties] = useState([]);
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [displayedProperties, setDisplayedProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [filters, setFilters] = useState(getDefaultFilters());
-  const [appliedFilters, setAppliedFilters] = useState(getDefaultFilters());
+  const [filters, setFilters] = useState(() => {
+    const urlFilters = getFiltersFromURL();
+    const hasUrlParams = Object.values(urlFilters).some(val => val && val !== 'all' && val !== '');
+    return hasUrlParams ? urlFilters : getDefaultFilters();
+  });
+  const [appliedFilters, setAppliedFilters] = useState(() => {
+    const urlFilters = getFiltersFromURL();
+    const hasUrlParams = Object.values(urlFilters).some(val => val && val !== 'all' && val !== '');
+    return hasUrlParams ? urlFilters : getDefaultFilters();
+  });
 
-  // Load properties on component mount
+  // MODIFIED load properties useEffect to handle URL restoration
   useEffect(() => {
     const loadProperties = async () => {
       setLoading(true);
@@ -57,9 +96,22 @@ const PropertyListings = () => {
         console.log('Properties loaded:', response);
         const propertyData = response.data || [];
         setProperties(propertyData);
-        setFilteredProperties(propertyData);
-        setDisplayedProperties(propertyData);
-        setAppliedFilters(getDefaultFilters());
+        
+        // Check if we have URL parameters to restore search
+        const urlFilters = getFiltersFromURL();
+        const hasSearchParams = Object.values(urlFilters).some(val => val && val !== 'all' && val !== '');
+        
+        if (hasSearchParams) {
+          // Restore search from URL - trigger search immediately
+          setFilters(urlFilters);
+          setAppliedFilters(urlFilters);
+          // Don't set the default data, let the search effect handle it
+        } else {
+          // No search params, show all properties
+          setFilteredProperties(propertyData);
+          setDisplayedProperties(propertyData);
+          setAppliedFilters(getDefaultFilters());
+        }
       } catch (error) {
         console.error('Error loading properties:', error);
         setProperties([]);
@@ -74,7 +126,7 @@ const PropertyListings = () => {
     loadProperties();
   }, []);
 
-// Handle search and filtering with debounce
+// Your existing search and filtering useEffect stays exactly the same
 useEffect(() => {
   const performSearch = async () => {
     if (properties.length === 0) return;
@@ -113,19 +165,39 @@ useEffect(() => {
   return () => clearTimeout(timeoutId);
 }, [filters, properties]);
 
-// Event handlers
+// ADD new useEffect to sync with URL changes (browser back/forward)
+useEffect(() => {
+  const handleUrlChange = () => {
+    const urlFilters = getFiltersFromURL();
+    const hasUrlParams = Object.values(urlFilters).some(val => val && val !== 'all' && val !== '');
+    
+    if (hasUrlParams) {
+      setFilters(urlFilters);
+    } else {
+      setFilters(getDefaultFilters());
+    }
+  };
+
+  handleUrlChange();
+}, [searchParams]);
+
+// MODIFIED event handlers to update URL
 const handleFilterChange = (field, value) => {
-  setFilters(prev => ({
-    ...prev,
+  const newFilters = {
+    ...filters,
     [field]: value,
     ...(field === 'type' && { subtype: 'all' })
-  }));
+  };
+  
+  setFilters(newFilters);
+  updateURL(newFilters); // ADD this line
 };
 
 const handleClearFilters = () => {
   const defaultFilters = getDefaultFilters();
   setFilters(defaultFilters);
   setAppliedFilters(defaultFilters);
+  setSearchParams(new URLSearchParams(), { replace: true }); // ADD this line
 };
 
   const handleLoadMore = async () => {

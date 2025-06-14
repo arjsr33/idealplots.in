@@ -87,7 +87,13 @@ export const handleContactAgent = (property, event) => {
 // Property click handler - Updated for routing
 export const handlePropertyClick = (property, navigate) => {
   const slug = generatePropertySlug(property);
-  navigate(`/property/${slug}`);
+  const currentSearch = window.location.search;
+
+  navigate(`/property/${slug}`, {
+  state: {
+    returnUrl: `/${currentSearch}`,
+    fromSearch: true
+  }});
 };
 
 // Animation delay calculator

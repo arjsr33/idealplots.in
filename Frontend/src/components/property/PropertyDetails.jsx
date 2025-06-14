@@ -175,6 +175,24 @@ const PropertyDetails = () => {
 
   // Event handlers
   const handleBackToListings = () => {
+    const state = location.state;
+    
+    // If we have a return URL from navigation state, use it
+    if (state?.returnUrl) {
+      navigate(state.returnUrl);
+      return;
+    }
+    
+    // If we have URL referrer information, try to use it
+    if (document.referrer && document.referrer.includes(window.location.origin)) {
+      const referrerUrl = new URL(document.referrer);
+      if (referrerUrl.pathname === '/' && referrerUrl.search) {
+        navigate(`/${referrerUrl.search}`);
+        return;
+      }
+    }
+    
+    // Fallback to home page
     navigate('/');
   };
 
