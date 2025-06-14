@@ -1,4 +1,5 @@
 import React from 'react';
+import { getOrganizationSchema } from './utils/OrganizationSchema';
 import { Helmet } from 'react-helmet';
 import { 
   generatePropertyKeywords,
@@ -54,29 +55,7 @@ const PropertyDetailsSEO = ({
   };
 
   // Organization structured data
-  const organizationData = {
-    "@context": "https://schema.org",
-    "@type": "RealEstateAgent",
-    "name": "Ideal Plots",
-    "url": baseUrl,
-    "logo": `${baseUrl}/Idealplotslogo.jpg`,
-    "description": "Premium real estate services in Kerala",
-    "address": {
-      "@type": "PostalAddress",
-      "addressRegion": "Kerala",
-      "addressCountry": "IN"
-    },
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "telephone": property.agentContact,
-      "contactType": "sales",
-      "availableLanguage": ["English", "Malayalam", "Hindi"]
-    },
-    "areaServed": {
-      "@type": "State",
-      "name": "Kerala"
-    }
-  };
+  const organizationData = getOrganizationSchema(baseUrl, property.agentContact);
 
   // FAQ structured data for property
   const faqData = {

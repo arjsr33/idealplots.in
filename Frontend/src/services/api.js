@@ -1,38 +1,6 @@
 // API configuration and methods for backend integration
 import { mockProperties, searchProperties as mockSearchProperties, getPropertyStats as mockGetPropertyStats } from '../data/mockData';
-
-// Import utility functions for clean URL generation
-const generatePropertySlug = (property) => {
-  if (!property || !property.title || !property.city || !property.location) {
-    throw new Error('Property must have title, city, and location to generate slug');
-  }
-  
-  // Create SEO-friendly slug from title, location, and city
-  const titleSlug = property.title
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '') // Remove special characters except hyphens and spaces
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .trim(); // Remove leading/trailing spaces
-  
-  const locationSlug = property.location
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim();
-  
-  const citySlug = property.city
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/\(|\)/g, '') // Remove parentheses from city names like "Kozhikode (Calicut)"
-    .trim();
-  
-  // Combine title, location, and city for uniqueness without ID
-  return `${titleSlug}-${locationSlug}-${citySlug}`;
-};
+import { generatePropertySlug } from '../components/property/utils/PropertyUtils';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
@@ -61,6 +29,28 @@ class ApiClient {
   removeAuthToken() {
     localStorage.removeItem('authToken');
   }
+  enhancePropertyData(property) {
+  if (!property) return null;
+  
+  return {
+    ...property,
+    // Add mock data for fields that might come from backend
+    validThrough: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days from now
+    availabilityStarts: property.datePosted,
+    lastUpdated: new Date().toISOString(),
+    viewCount: Math.floor(Math.random() * 1000) + 100,
+    inquiryCount: Math.floor(Math.random() * 50) + 10,
+    // Ensure all images are available
+    images: property.images && property.images.length > 0 ? property.images : [property.mainImage],
+    // Add more detailed features if not present
+    features: property.features || [
+      'DTCP Approved',
+      'Clear Title',
+      'Ready to Move',
+      'Prime Location'
+    ]
+  };
+}
 
   // Get headers with authentication if available
   getHeaders(customHeaders = {}) {
@@ -143,24 +133,7 @@ class ApiClient {
         
         if (property) {
           // Add additional data that might be needed for property details page
-          const enhancedProperty = {
-            ...property,
-            // Add mock data for fields that might come from backend
-            validThrough: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days from now
-            availabilityStarts: property.datePosted,
-            lastUpdated: new Date().toISOString(),
-            viewCount: Math.floor(Math.random() * 1000) + 100,
-            inquiryCount: Math.floor(Math.random() * 50) + 10,
-            // Ensure all images are available
-            images: property.images && property.images.length > 0 ? property.images : [property.mainImage],
-            // Add more detailed features if not present
-            features: property.features || [
-              'DTCP Approved',
-              'Clear Title',
-              'Ready to Move',
-              'Prime Location'
-            ]
-          };
+          const enhancedProperty = this.enhancePropertyData(property);;
           
           return { success: true, data: enhancedProperty };
         } else {
@@ -267,24 +240,7 @@ class ApiClient {
         const property = mockProperties.find(p => p.id === id);
         if (property) {
           // Add additional data that might be needed for property details page
-          const enhancedProperty = {
-            ...property,
-            // Add mock data for fields that might come from backend
-            validThrough: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days from now
-            availabilityStarts: property.datePosted,
-            lastUpdated: new Date().toISOString(),
-            viewCount: Math.floor(Math.random() * 1000) + 100,
-            inquiryCount: Math.floor(Math.random() * 50) + 10,
-            // Ensure all images are available
-            images: property.images && property.images.length > 0 ? property.images : [property.mainImage],
-            // Add more detailed features if not present
-            features: property.features || [
-              'DTCP Approved',
-              'Clear Title',
-              'Ready to Move',
-              'Prime Location'
-            ]
-          };
+          const enhancedProperty = this.enhancePropertyData(property);
           
           return { success: true, data: enhancedProperty };
         } else {

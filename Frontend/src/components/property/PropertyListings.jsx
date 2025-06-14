@@ -45,8 +45,8 @@ const PropertyListings = () => {
   const [displayedProperties, setDisplayedProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [currentFilters, setCurrentFilters] = useState(getDefaultFilters());
-  const [searchFilters, setSearchFilters] = useState(getDefaultFilters());
+  const [filters, setFilters] = useState(getDefaultFilters());
+  const [appliedFilters, setAppliedFilters] = useState(getDefaultFilters());
 
   // Load properties on component mount
   useEffect(() => {
@@ -59,13 +59,13 @@ const PropertyListings = () => {
         setProperties(propertyData);
         setFilteredProperties(propertyData);
         setDisplayedProperties(propertyData);
-        setCurrentFilters(getDefaultFilters());
+        setAppliedFilters(getDefaultFilters());
       } catch (error) {
         console.error('Error loading properties:', error);
         setProperties([]);
         setFilteredProperties([]);
         setDisplayedProperties([]);
-        setCurrentFilters(getDefaultFilters());
+        setAppliedFilters(getDefaultFilters());
       } finally {
         setLoading(false);
       }
@@ -74,57 +74,59 @@ const PropertyListings = () => {
     loadProperties();
   }, []);
 
-  // Handle search and filtering with debounce
-  useEffect(() => {
-    const performSearch = async () => {
-      if (properties.length === 0) return;
+// Handle search and filtering with debounce
+useEffect(() => {
+  const performSearch = async () => {
+    if (properties.length === 0) return;
 
-      setSearching(true);
-      await new Promise(resolve => setTimeout(resolve, 100));
+    setSearching(true);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    try {
+      const searchParams = prepareSearchParams(filters);
       
-      try {
-        const searchParams = prepareSearchParams(searchFilters);
-        
-        let results;
-        if (Object.keys(searchParams).length === 0) {
-          results = properties;
-        } else {
-          const response = await api.properties.search(searchParams);
-          results = response.data || [];
-        }
-        
-        setFilteredProperties(results);
-        setDisplayedProperties(results);
-        setCurrentFilters({ ...searchFilters });
-        
-      } catch (error) {
-        console.error('Error searching properties:', error);
-        setFilteredProperties(properties);
-        setDisplayedProperties(properties);
-        setCurrentFilters({ ...searchFilters });
-      } finally {
-        setTimeout(() => {
-          setSearching(false);
-        }, LOADING_TRANSITION_DELAY);
+      let results;
+      if (Object.keys(searchParams).length === 0) {
+        results = properties;
+      } else {
+        const response = await api.properties.search(searchParams);
+        results = response.data || [];
       }
-    };
-
-    const timeoutId = setTimeout(performSearch, SEARCH_DEBOUNCE_DELAY);
-    return () => clearTimeout(timeoutId);
-  }, [searchFilters, properties]);
-
-  // Event handlers
-  const handleFilterChange = (field, value) => {
-    setSearchFilters(prev => ({
-      ...prev,
-      [field]: value,
-      ...(field === 'type' && { subtype: 'all' })
-    }));
+      
+      setFilteredProperties(results);
+      setDisplayedProperties(results);
+      setAppliedFilters({ ...filters });
+      
+    } catch (error) {
+      console.error('Error searching properties:', error);
+      setFilteredProperties(properties);
+      setDisplayedProperties(properties);
+      setAppliedFilters({ ...filters });
+    } finally {
+      setTimeout(() => {
+        setSearching(false);
+      }, LOADING_TRANSITION_DELAY);
+    }
   };
 
-  const handleClearFilters = () => {
-    setSearchFilters(getDefaultFilters());
-  };
+  const timeoutId = setTimeout(performSearch, SEARCH_DEBOUNCE_DELAY);
+  return () => clearTimeout(timeoutId);
+}, [filters, properties]);
+
+// Event handlers
+const handleFilterChange = (field, value) => {
+  setFilters(prev => ({
+    ...prev,
+    [field]: value,
+    ...(field === 'type' && { subtype: 'all' })
+  }));
+};
+
+const handleClearFilters = () => {
+  const defaultFilters = getDefaultFilters();
+  setFilters(defaultFilters);
+  setAppliedFilters(defaultFilters);
+};
 
   const handleLoadMore = async () => {
     try {
@@ -175,12 +177,12 @@ const PropertyListings = () => {
 
   // Get results header text
   const getResultsHeaderText = () => {
-    if (currentFilters.city !== 'all' && currentFilters.type !== 'all') {
-      return `Properties in ${currentFilters.city} - ${propertyTypes[currentFilters.type]?.name}`;
-    } else if (currentFilters.city !== 'all') {
-      return `Properties in ${currentFilters.city}`;
-    } else if (currentFilters.type !== 'all') {
-      return `${propertyTypes[currentFilters.type]?.name} Properties`;
+  if (appliedFilters.city !== 'all' && appliedFilters.type !== 'all') {
+      return `Properties in ${appliedFilters.city} - ${propertyTypes[appliedFilters.type]?.name}`;
+    } else if (appliedFilters.city !== 'all') {
+      return `Properties in ${appliedFilters.city}`;
+    } else if (appliedFilters.type !== 'all') {
+      return `${propertyTypes[appliedFilters.type]?.name} Properties`;
     } else {
       return 'All Properties';
     }
@@ -190,7 +192,7 @@ const PropertyListings = () => {
     <Box sx={{ width: '100%', px: { xs: 1, sm: 2, md: 3 }, py: 4 }}>
       {/* Dynamic SEO Component */}
       <DynamicSEO
-        filters={currentFilters}
+        filters={appliedFilters}
         properties={displayedProperties}
         propertyTypes={propertyTypes}
         keralaCities={keralaCities}
@@ -204,7 +206,7 @@ const PropertyListings = () => {
 
       {/* Search Component */}
       <PropertySearch
-        searchFilters={searchFilters}
+        searchFilters={filters}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
         propertyTypes={propertyTypes}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
+import { getOrganizationSchema } from '../components/property/utils/OrganizationSchema';
 
 const SEO = ({
   title = 'Ideal Plots - Premium Real Estate in Kerala',
@@ -32,42 +33,8 @@ const SEO = ({
 
   // Combine all keywords
   const allKeywords = [keywords, locationKeywords].filter(Boolean).join(', ');
-
-  // Default organization structured data for Ideal Plots
-  const defaultOrganizationData = {
-    "@context": "https://schema.org",
-    "@type": "RealEstateAgent",
-    "name": "Ideal Plots",
-    "url": "https://idealplots.in",
-    "logo": "https://idealplots.in/logo.png",
-    "description": "Premium real estate services in Kerala specializing in residential and commercial properties",
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": "Thrissur",
-      "addressRegion": "Kerala",
-      "addressCountry": "IN"
-    },
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "telephone": "+91-XXXXXXXXXX",
-      "contactType": "customer service",
-      "availableLanguage": ["English", "Malayalam", "Hindi"]
-    },
-    "areaServed": [
-      {
-        "@type": "State",
-        "name": "Kerala"
-      }
-    ],
-    "knowsAbout": [
-      "Real Estate",
-      "Property Sales",
-      "Land Development",
-      "Residential Properties",
-      "Commercial Properties"
-    ]
-  };
-
+  // Default Organisation scheme imported from OrganisationSchema.js 
+  const defaultOrganizationData = getOrganizationSchema(currentUrl);
   // Property-specific structured data
   const propertyStructuredData = propertyData ? {
     "@context": "https://schema.org",

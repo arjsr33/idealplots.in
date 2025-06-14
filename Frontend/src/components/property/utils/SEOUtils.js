@@ -1,4 +1,5 @@
 // SEO utility functions for property listings - Backend ready
+import { formatPriceShort } from './PropertyUtils';
 
 /**
  * Generate dynamic page title based on filters and property data
@@ -290,21 +291,6 @@ export const generateOpenGraphData = (filters, properties = [], baseUrl = '') =>
     locale: 'en_IN'
   };
 };
-
-/**
- * Helper function to format price for titles/descriptions
- */
-const formatPriceShort = (price) => {
-  const numPrice = parseInt(price);
-  if (numPrice >= 10000000) {
-    return `${(numPrice / 10000000).toFixed(1)}Cr`;
-  } else if (numPrice >= 100000) {
-    return `${(numPrice / 100000).toFixed(1)}L`;
-  } else {
-    return `${numPrice.toLocaleString()}`;
-  }
-};
-
 /**
  * Backend-ready SEO data structure
  * This structure matches what backend should send

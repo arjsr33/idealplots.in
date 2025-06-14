@@ -10,6 +10,17 @@ export const formatPrice = (price) => {
   }
 };
 
+export const formatPriceShort = (price) => {
+  const numPrice = parseInt(price);
+  if (numPrice >= 10000000) {
+    return `${(numPrice / 10000000).toFixed(1)}Cr`;
+  } else if (numPrice >= 100000) {
+    return `${(numPrice / 100000).toFixed(1)}L`;
+  } else {
+    return `${numPrice.toLocaleString()}`;
+  }
+};
+
 export const formatArea = (area) => {
   if (area >= 43560) { // 1 acre = 43560 sq ft
     return `${(area / 43560).toFixed(2)} acres`;

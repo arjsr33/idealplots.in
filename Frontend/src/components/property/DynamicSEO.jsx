@@ -111,33 +111,14 @@ const DynamicSEO = ({
       <script type="application/ld+json">
         {JSON.stringify(seoData.structuredData.breadcrumb)}
       </script>
-      
-      {/* Additional Schema for Real Estate Website */}
+      {/* Property ItemList Schema Only */}
       <script type="application/ld+json">
         {JSON.stringify({
           "@context": "https://schema.org",
-          "@type": "WebPage",
-          "name": seoData.meta.title,
-          "description": seoData.meta.description,
-          "url": currentUrl,
-          "isPartOf": {
-            "@type": "WebSite",
-            "name": "Ideal Plots",
-            "url": baseUrl || (typeof window !== 'undefined' ? window.location.origin : ''),
-            "potentialAction": {
-              "@type": "SearchAction",
-              "target": {
-                "@type": "EntryPoint",
-                "urlTemplate": `${baseUrl}/properties?search={search_term_string}`
-              },
-              "query-input": "required name=search_term_string"
-            }
-          },
-          "mainEntity": {
-            "@type": "ItemList",
-            "name": `${seoData.additional?.propertyCount || 0} Properties Available`,
-            "numberOfItems": seoData.additional?.propertyCount || 0
-          }
+          "@type": "ItemList",
+          "name": `${seoData.additional?.propertyCount || 0} Properties Available`,
+          "numberOfItems": seoData.additional?.propertyCount || 0,
+          "url": currentUrl
         })}
       </script>
     </Helmet>
