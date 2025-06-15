@@ -52,21 +52,39 @@ import {
   parsePropertySlug
 } from './utils/PropertyUtils';
 
-// Styled Components
+// NEW: Import styled components from PropertyStyles.js instead of creating our own
+import {
+  PropertyCard,
+  PriceChip,
+  StatsContainer,
+} from './styles/PropertyStyles';
+
+// NEW: Import centralized theme constants for additional styling
+import {
+  BRAND_COLORS,
+  SEMANTIC_COLORS,
+  SHADOWS,
+  BORDER_RADIUS,
+  TRANSITIONS,
+  Z_INDEX,
+} from '../../theme/constants';
+
+// Create additional styled components that follow PropertyStyles.js patterns
 const HeroSection = styled(Box)(({ theme }) => ({
   position: 'relative',
   height: '60vh',
   overflow: 'hidden',
-  borderRadius: theme.spacing(2),
+  borderRadius: BORDER_RADIUS['2xl'],
   marginBottom: theme.spacing(4),
   cursor: 'pointer',
+  boxShadow: SHADOWS.lg,
 }));
 
 const HeroImage = styled('img')(({ theme }) => ({
   width: '100%',
   height: '100%',
   objectFit: 'cover',
-  transition: 'transform 0.3s ease',
+  transition: `transform ${TRANSITIONS.duration.normal} ${TRANSITIONS.easing.default}`,
   '&:hover': {
     transform: 'scale(1.05)',
   },
@@ -76,49 +94,93 @@ const PropertyStatusChip = styled(Chip)(({ theme }) => ({
   position: 'absolute',
   top: theme.spacing(2),
   right: theme.spacing(2),
-  zIndex: 2,
+  zIndex: Z_INDEX.base + 1,
   fontWeight: 'bold',
+  borderRadius: BORDER_RADIUS.xl,
+  boxShadow: SHADOWS.sm,
 }));
 
 const VerifiedBadge = styled(Box)(({ theme }) => ({
   position: 'absolute',
   top: theme.spacing(2),
   left: theme.spacing(2),
-  zIndex: 2,
-  backgroundColor: 'rgba(76, 175, 80, 0.9)',
+  zIndex: Z_INDEX.base + 1,
+  backgroundColor: SEMANTIC_COLORS.success.main,
   color: 'white',
   padding: theme.spacing(0.5, 1),
-  borderRadius: theme.spacing(1),
+  borderRadius: BORDER_RADIUS.lg,
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(0.5),
+  boxShadow: SHADOWS.sm,
 }));
 
-const PriceSection = styled(Paper)(({ theme }) => ({
+// Use the same styling pattern as PropertyCard for consistency
+const FeatureCard = styled(PropertyCard)(({ theme }) => ({
+  textAlign: 'center',
+  // PropertyCard already has hover effects, shadows, etc.
+}));
+
+// Enhanced contact card using centralized theme
+const ContactCard = styled(Card)(({ theme }) => ({
   padding: theme.spacing(3),
-  background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+  background: `linear-gradient(135deg, ${BRAND_COLORS.primary.main} 0%, ${BRAND_COLORS.primary.dark} 100%)`,
   color: 'white',
-  borderRadius: theme.spacing(2),
-  textAlign: 'center',
-}));
-
-const FeatureCard = styled(Card)(({ theme }) => ({
-  height: '100%',
-  textAlign: 'center',
-  transition: 'transform 0.2s ease',
+  borderRadius: BORDER_RADIUS['2xl'],
+  position: 'sticky',
+  top: theme.spacing(12),
+  boxShadow: SHADOWS.lg,
+  transition: `all ${TRANSITIONS.duration.normal} ${TRANSITIONS.easing.default}`,
+  
   '&:hover': {
-    transform: 'translateY(-4px)',
+    transform: 'scale(1.02)',
+    boxShadow: SHADOWS.xl,
   },
 }));
 
-const ContactCard = styled(Card)(({ theme }) => ({
+// Enhanced price section using PriceChip styling patterns
+const PriceSection = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
-  background: 'linear-gradient(135deg, #2E5BBA 0%, #1E3F8A 100%)',
+  background: `linear-gradient(135deg, ${SEMANTIC_COLORS.success.main} 0%, ${SEMANTIC_COLORS.success.light} 100%)`,
   color: 'white',
-  borderRadius: theme.spacing(2),
-  position: 'sticky',
-  top: theme.spacing(12),
+  borderRadius: BORDER_RADIUS['2xl'],
+  textAlign: 'center',
+  boxShadow: SHADOWS.md,
 }));
+
+// Enhanced action buttons following PropertyStyles.js patterns
+const ActionButton = styled(Button)(({ theme, variant = 'primary' }) => {
+  const variants = {
+    primary: {
+      background: `linear-gradient(135deg, ${BRAND_COLORS.primary.main} 0%, ${BRAND_COLORS.primary.dark} 100%)`,
+      color: 'white',
+    },
+    secondary: {
+      background: `linear-gradient(135deg, ${BRAND_COLORS.secondary.main} 0%, ${BRAND_COLORS.secondary.dark} 100%)`,
+      color: 'white',
+    },
+    success: {
+      background: `linear-gradient(135deg, ${SEMANTIC_COLORS.success.main} 0%, ${SEMANTIC_COLORS.success.dark} 100%)`,
+      color: 'white',
+    },
+  };
+
+  return {
+    ...variants[variant],
+    borderRadius: BORDER_RADIUS.xl,
+    padding: theme.spacing(1.5, 3),
+    fontWeight: 600,
+    textTransform: 'none',
+    boxShadow: SHADOWS.md,
+    transition: `all ${TRANSITIONS.duration.normal} ${TRANSITIONS.easing.default}`,
+    
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      boxShadow: SHADOWS.lg,
+      filter: 'brightness(1.1)',
+    },
+  };
+});
 
 const PropertyDetails = () => {
   const { propertySlug } = useParams();
@@ -250,7 +312,7 @@ const PropertyDetails = () => {
       <>
         <Navbar />
         <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-          <Skeleton variant="rectangular" height={400} sx={{ mb: 4, borderRadius: 2 }} />
+          <Skeleton variant="rectangular" height={400} sx={{ mb: 4, borderRadius: BORDER_RADIUS['2xl'] }} />
           <Grid container spacing={3}>
             <Grid item xs={12} md={8}>
               <Skeleton variant="text" height={60} />
@@ -258,7 +320,7 @@ const PropertyDetails = () => {
               <Skeleton variant="text" height={200} />
             </Grid>
             <Grid item xs={12} md={4}>
-              <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 2 }} />
+              <Skeleton variant="rectangular" height={300} sx={{ borderRadius: BORDER_RADIUS['2xl'] }} />
             </Grid>
           </Grid>
         </Container>
@@ -275,13 +337,13 @@ const PropertyDetails = () => {
           <Alert severity="error" sx={{ mb: 4 }}>
             {error}
           </Alert>
-          <Button
-            variant="contained"
+          <ActionButton
+            variant="primary"
             startIcon={<ArrowBackIcon />}
             onClick={handleBackToListings}
           >
             Back to Properties
-          </Button>
+          </ActionButton>
         </Container>
       </>
     );
@@ -321,13 +383,14 @@ const PropertyDetails = () => {
         </Breadcrumbs>
 
         {/* Back Button */}
-        <Button
+        <ActionButton
+          variant="primary"
           startIcon={<ArrowBackIcon />}
           onClick={handleBackToListings}
           sx={{ mb: 3 }}
         >
           Back to Properties
-        </Button>
+        </ActionButton>
 
         {/* Hero Image Section */}
         <Fade in timeout={800}>
@@ -404,7 +467,7 @@ const PropertyDetails = () => {
                   </Box>
                 </Box>
 
-                {/* Property Features Grid */}
+                {/* Property Features Grid using FeatureCard from PropertyStyles pattern */}
                 <Grid container spacing={2} sx={{ mb: 4 }}>
                   <Grid item xs={6} sm={3}>
                     <FeatureCard>
@@ -470,7 +533,7 @@ const PropertyDetails = () => {
                 </Grid>
 
                 {/* Description */}
-                <Paper sx={{ p: 3, mb: 4 }}>
+                <Paper sx={{ p: 3, mb: 4, borderRadius: BORDER_RADIUS['2xl'] }}>
                   <Typography variant="h5" fontWeight="600" gutterBottom>
                     Description
                   </Typography>
@@ -479,19 +542,17 @@ const PropertyDetails = () => {
                   </Typography>
                 </Paper>
 
-                {/* Features */}
+                {/* Features using PriceChip-like styling */}
                 {property.features && property.features.length > 0 && (
-                  <Paper sx={{ p: 3, mb: 4 }}>
+                  <Paper sx={{ p: 3, mb: 4, borderRadius: BORDER_RADIUS['2xl'] }}>
                     <Typography variant="h5" fontWeight="600" gutterBottom>
                       Property Features
                     </Typography>
                     <Box display="flex" flexWrap="wrap" gap={1}>
                       {property.features.map((feature, index) => (
-                        <Chip
+                        <PriceChip
                           key={index}
                           label={feature}
-                          variant="outlined"
-                          color="primary"
                           icon={<StarIcon />}
                         />
                       ))}
@@ -501,7 +562,7 @@ const PropertyDetails = () => {
 
                 {/* Image Gallery */}
                 {property.images && property.images.length > 1 && (
-                  <Paper sx={{ p: 3, mb: 4 }}>
+                  <Paper sx={{ p: 3, mb: 4, borderRadius: BORDER_RADIUS['2xl'] }}>
                     <Typography variant="h5" fontWeight="600" gutterBottom>
                       Gallery
                     </Typography>
@@ -516,7 +577,7 @@ const PropertyDetails = () => {
                             src={image}
                             alt={`${property.title} - Image ${index + 1}`}
                             loading="lazy"
-                            style={{ borderRadius: 8 }}
+                            style={{ borderRadius: BORDER_RADIUS.lg }}
                           />
                         </ImageListItem>
                       ))}
@@ -560,36 +621,23 @@ const PropertyDetails = () => {
                   <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
                   
                   <Box display="flex" flexDirection="column" gap={2}>
-                    <Button
-                      variant="contained"
+                    <ActionButton
+                      variant="secondary"
                       fullWidth
                       startIcon={<PhoneIcon />}
                       onClick={handleContactClick}
-                      sx={{ 
-                        bgcolor: 'white', 
-                        color: 'primary.main',
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' }
-                      }}
                     >
                       Call Now
-                    </Button>
+                    </ActionButton>
                     
-                    <Button
-                      variant="outlined"
+                    <ActionButton
+                      variant="success"
                       fullWidth
                       startIcon={<WhatsAppIcon />}
                       onClick={handleWhatsAppClick}
-                      sx={{ 
-                        borderColor: 'white', 
-                        color: 'white',
-                        '&:hover': { 
-                          borderColor: 'white', 
-                          bgcolor: 'rgba(255,255,255,0.1)' 
-                        }
-                      }}
                     >
                       WhatsApp
-                    </Button>
+                    </ActionButton>
                     
                     <Button
                       variant="outlined"
@@ -598,6 +646,7 @@ const PropertyDetails = () => {
                       sx={{ 
                         borderColor: 'white', 
                         color: 'white',
+                        borderRadius: BORDER_RADIUS.xl,
                         '&:hover': { 
                           borderColor: 'white', 
                           bgcolor: 'rgba(255,255,255,0.1)' 

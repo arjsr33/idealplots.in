@@ -14,20 +14,34 @@ import SEO from '../components/SEO';
 import Navbar from '../components/Navbar';
 import PropertyListings from '../components/property/PropertyListings';
 
-// Styled components for animations and custom styling
+// Import centralized design constants
+import {
+  BRAND_COLORS,
+  SHADOWS,
+  BORDER_RADIUS,
+  TRANSITIONS,
+  Z_INDEX,
+} from '../theme/constants';
+
+// Styled components with centralized styling
 const HeroSection = styled(Box)(({ theme }) => ({
   position: 'relative',
   color: 'white',
-  padding: theme.spacing(8, 0), // Reduced from 12 to 8
+  padding: theme.spacing(8, 0),
   textAlign: 'center',
-  minHeight: '45vh', // Reduced from 70vh to 45vh (35% reduction)
+  minHeight: '45vh',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   flexDirection: 'column',
   overflow: 'hidden',
-  // Fallback background - only shows if video fails to load
-  backgroundColor: '#1e3c72',
+  // Use centralized color instead of hard-coded
+  backgroundColor: BRAND_COLORS.primary.dark,
+  
+  [theme.breakpoints.down('md')]: {
+    minHeight: '35vh',
+    padding: theme.spacing(6, 0),
+  },
 }));
 
 const VideoBackground = styled('video')(({ theme }) => ({
@@ -37,7 +51,7 @@ const VideoBackground = styled('video')(({ theme }) => ({
   width: '100%',
   height: '100%',
   objectFit: 'cover',
-  zIndex: 1, // Above background but below overlay
+  zIndex: Z_INDEX.base + 1, // Use centralized z-index
 }));
 
 const VideoOverlay = styled(Box)({
@@ -46,14 +60,56 @@ const VideoOverlay = styled(Box)({
   left: 0,
   width: '100%',
   height: '100%',
-  backgroundColor: 'rgba(0, 0, 0, 0.4)', // Dark overlay for text readability
-  zIndex: 2, // Above video
+  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  zIndex: Z_INDEX.base + 2, // Use centralized z-index
 });
 
 const ContentContainer = styled(Container)({
   position: 'relative',
-  zIndex: 3, // Above everything else
+  zIndex: Z_INDEX.base + 3, // Use centralized z-index
 });
+
+// Hero button with centralized styling
+const HeroButton = styled(Button)(({ theme }) => ({
+  padding: theme.spacing(2, 4),
+  fontSize: '1.1rem',
+  backgroundColor: 'rgba(255,255,255,0.9)',
+  color: BRAND_COLORS.primary.main, // Use centralized color
+  backdropFilter: 'blur(10px)',
+  borderRadius: BORDER_RADIUS.xl, // Use centralized border radius
+  boxShadow: SHADOWS.lg, // Use centralized shadow
+  transition: `all ${TRANSITIONS.duration.normal} ${TRANSITIONS.easing.default}`, // Use centralized transition
+  
+  '&:hover': {
+    backgroundColor: 'rgba(255,255,255,1)',
+    transform: 'scale(1.05)',
+    boxShadow: SHADOWS.xl, // Use centralized shadow
+  },
+}));
+
+// CTA section with centralized gradient
+const CTASection = styled(Box)(({ theme }) => ({
+  background: `linear-gradient(135deg, ${BRAND_COLORS.primary.main} 0%, ${BRAND_COLORS.primary.dark} 100%)`,
+  color: 'white',
+  padding: theme.spacing(8, 0),
+  textAlign: 'center',
+}));
+
+// CTA button with centralized styling
+const CTAButton = styled(Button)(({ theme }) => ({
+  borderColor: 'white',
+  color: 'white',
+  padding: theme.spacing(2, 4),
+  borderRadius: BORDER_RADIUS.xl, // Use centralized border radius
+  transition: `all ${TRANSITIONS.duration.normal} ${TRANSITIONS.easing.default}`, // Use centralized transition
+  
+  '&:hover': {
+    borderColor: 'white',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    transform: 'translateY(-2px)',
+    boxShadow: SHADOWS.md, // Use centralized shadow
+  },
+}));
 
 const Homepage = () => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -65,11 +121,15 @@ const Homepage = () => {
   }, []);
 
   const handleGetStarted = () => {
-    // Scroll to property listings section
     const propertySection = document.querySelector('#property-listings');
     if (propertySection) {
       propertySection.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const handleContactUs = () => {
+    console.log('Contact Us clicked');
+    // Future: Add contact functionality
   };
 
   return (
@@ -90,7 +150,7 @@ const Homepage = () => {
         {/* Hero Section with Video Background */}
         <Fade in={isLoaded} timeout={1000}>
           <HeroSection>
-            {/* Video Background - Always Visible */}
+            {/* Video Background */}
             <VideoBackground
               autoPlay
               muted
@@ -108,17 +168,17 @@ const Homepage = () => {
             {/* Dark Overlay for Text Readability */}
             <VideoOverlay />
             
-            {/* Content Container with Proper Z-Index */}
+            {/* Content Container */}
             <ContentContainer maxWidth="md">
               <Slide direction="down" in={isLoaded} timeout={1200}>
                 <div>
                   <Typography
-                    variant={isMobile ? 'h4' : 'h2'} // Reduced from h3/h1 to h4/h2
+                    variant={isMobile ? 'h4' : 'h2'}
                     component="h1"
                     gutterBottom
                     sx={{ 
-                      fontWeight: 600, // Reduced from 700 to 600
-                      mb: 1.5, // Reduced margin
+                      fontWeight: 600,
+                      mb: 1.5,
                       textShadow: '2px 2px 4px rgba(0,0,0,0.5)' 
                     }}
                   >
@@ -130,14 +190,14 @@ const Homepage = () => {
               <Slide direction="up" in={isLoaded} timeout={1400}>
                 <div>
                   <Typography
-                    variant={isMobile ? 'body2' : 'h6'} // Reduced from body1/h5 to body2/h6
+                    variant={isMobile ? 'body2' : 'h6'}
                     component="h2"
                     sx={{ 
-                      mb: 3, // Reduced margin
+                      mb: 3,
                       opacity: 0.9, 
                       fontWeight: 300,
                       textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
-                      maxWidth: '600px', // Reduced from 800px
+                      maxWidth: '600px',
                       mx: 'auto'
                     }}
                   >
@@ -148,27 +208,13 @@ const Homepage = () => {
 
               <Fade in={isLoaded} timeout={1600}>
                 <Box>
-                  <Button
+                  <HeroButton
                     variant="contained"
                     size="large"
                     onClick={handleGetStarted}
-                    sx={{
-                      px: 4,
-                      py: 2,
-                      fontSize: '1.1rem',
-                      backgroundColor: 'rgba(255,255,255,0.9)',
-                      color: 'primary.main',
-                      backdropFilter: 'blur(10px)',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255,255,255,1)',
-                        transform: 'scale(1.05)',
-                      },
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                    }}
                   >
                     Explore Properties
-                  </Button>
+                  </HeroButton>
                 </Box>
               </Fade>
             </ContentContainer>
@@ -181,14 +227,7 @@ const Homepage = () => {
         </Box>
 
         {/* CTA Section */}
-        <Box
-          sx={{
-            backgroundColor: 'primary.main',
-            color: 'white',
-            py: 8,
-            textAlign: 'center',
-          }}
-        >
+        <CTASection>
           <Container maxWidth="md">
             <Typography variant="h4" component="h2" gutterBottom>
               Ready to Find Your Dream Property?
@@ -196,24 +235,15 @@ const Homepage = () => {
             <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
               Join thousands of satisfied customers who found their perfect property with Ideal Plots
             </Typography>
-            <Button
+            <CTAButton
               variant="outlined"
               size="large"
-              sx={{
-                borderColor: 'white',
-                color: 'white',
-                px: 4,
-                py: 2,
-                '&:hover': {
-                  borderColor: 'white',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                },
-              }}
+              onClick={handleContactUs}
             >
               Contact Us Today
-            </Button>
+            </CTAButton>
           </Container>
-        </Box>
+        </CTASection>
       </Box>
     </>
   );
