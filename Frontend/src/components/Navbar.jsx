@@ -1,3 +1,4 @@
+// src/components/Navbar.jsx - Updated with Sell Property Integration
 import React, { useState, useEffect } from 'react';
 import {
   AppBar,
@@ -30,10 +31,16 @@ import {
   rgba,
 } from '../theme/constants';
 
+// Import both overlay components
+import EnquiryFormOverlay from './EnquiryFormOverlay';
+import SellPropertyOverlay from './SellPropertyOverlay';
+
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [enquiryFormOpen, setEnquiryFormOpen] = useState(false);
+  const [sellPropertyOpen, setSellPropertyOpen] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -47,11 +54,36 @@ const Navbar = () => {
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
   const handleLogoClick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Navigation items
+  // Handle enquiry form
+  const handleEnquiryClick = () => {
+    setEnquiryFormOpen(true);
+    if (mobileOpen) setMobileOpen(false);
+  };
+
+  // Handle sell property form
+  const handleSellPropertyClick = () => {
+    setSellPropertyOpen(true);
+    if (mobileOpen) setMobileOpen(false);
+  };
+
+  // Navigation items with updated handlers
   const navItems = [
-    { label: 'Submit Enquiry', icon: <PhoneIcon />, onClick: () => console.log('Submit Enquiry') },
-    { label: 'Sell Property', icon: <SellIcon />, onClick: () => console.log('Sell Property') },
-    { label: 'Login', icon: <LoginIcon />, onClick: () => console.log('Login'), primary: true },
+    { 
+      label: 'Submit Enquiry', 
+      icon: <PhoneIcon />, 
+      onClick: handleEnquiryClick 
+    },
+    { 
+      label: 'Sell Property', 
+      icon: <SellIcon />, 
+      onClick: handleSellPropertyClick 
+    },
+    { 
+      label: 'Login', 
+      icon: <LoginIcon />, 
+      onClick: () => console.log('Login'), 
+      primary: true 
+    },
   ];
 
   // Mobile drawer
@@ -77,7 +109,16 @@ const Navbar = () => {
       </Box>
       <List>
         {navItems.map((item) => (
-          <ListItem key={item.label} onClick={item.onClick} sx={{ cursor: 'pointer' }}>
+          <ListItem 
+            key={item.label} 
+            onClick={() => {
+              item.onClick();
+              if (!item.label.includes('Submit') && !item.label.includes('Sell')) {
+                setMobileOpen(false);
+              }
+            }} 
+            sx={{ cursor: 'pointer' }}
+          >
             <Box display="flex" alignItems="center" width="100%">
               <Box sx={{ mr: 2, color: BRAND_COLORS.tertiary.main }}>{item.icon}</Box>
               <ListItemText 
@@ -110,6 +151,7 @@ const Navbar = () => {
           borderBottom: scrolled ? `1px solid ${rgba(BRAND_COLORS.tertiary.main, 0.2)}` : 'none',
           zIndex: Z_INDEX.navbar,
           width: '100%',
+          borderRadius: 0,
         }}
       >
         <Toolbar sx={{ 
@@ -285,6 +327,18 @@ const Navbar = () => {
       >
         {drawer}
       </Drawer>
+
+      {/* Enquiry Form Overlay */}
+      <EnquiryFormOverlay 
+        open={enquiryFormOpen} 
+        onClose={() => setEnquiryFormOpen(false)} 
+      />
+
+      {/* Sell Property Overlay */}
+      <SellPropertyOverlay 
+        open={sellPropertyOpen} 
+        onClose={() => setSellPropertyOpen(false)} 
+      />
 
       {/* Spacer */}
       <Toolbar sx={{ minHeight: { xs: '60px', sm: '68px' } }} />
