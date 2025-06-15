@@ -380,11 +380,11 @@ const PropertyDetails = () => {
           <Skeleton variant="text" height={80} sx={{ mb: 2 }} />
           <Skeleton variant="rectangular" height={300} sx={{ mb: 3, borderRadius: BORDER_RADIUS['2xl'] }} />
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Skeleton variant="rectangular" height={200} sx={{ mb: 2, borderRadius: BORDER_RADIUS.xl }} />
               <Skeleton variant="rectangular" height={150} sx={{ borderRadius: BORDER_RADIUS.xl }} />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Skeleton variant="rectangular" height={200} sx={{ mb: 2, borderRadius: BORDER_RADIUS.xl }} />
               <Skeleton variant="rectangular" height={150} sx={{ borderRadius: BORDER_RADIUS.xl }} />
             </Grid>
@@ -530,7 +530,7 @@ const PropertyDetails = () => {
         {/* Content Below Image - Split Layout */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           {/* Left Half - Property Details, Price, Contact */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Slide direction="right" in timeout={1000}>
               <Box>
                 {/* Property Details Grid */}
@@ -539,7 +539,7 @@ const PropertyDetails = () => {
                 </Typography>
                 
                 <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid item xs={6}>
+                  <Grid size={{ xs: 6 }}>
                     <FeatureCard>
                       <CardContent>
                         <AreaIcon color="primary" fontSize="large" />
@@ -554,7 +554,7 @@ const PropertyDetails = () => {
                   </Grid>
                   
                   {property.bedrooms !== undefined && (
-                    <Grid item xs={6}>
+                    <Grid size={{ xs: 6 }}>
                       <FeatureCard>
                         <CardContent>
                           <BedIcon color="primary" fontSize="large" />
@@ -570,7 +570,7 @@ const PropertyDetails = () => {
                   )}
                   
                   {property.bathrooms && (
-                    <Grid item xs={6}>
+                    <Grid size={{ xs: 6 }}>
                       <FeatureCard>
                         <CardContent>
                           <BathIcon color="primary" fontSize="large" />
@@ -586,7 +586,7 @@ const PropertyDetails = () => {
                   )}
                   
                   {property.parking && (
-                    <Grid item xs={6}>
+                    <Grid size={{ xs: 6 }}>
                       <FeatureCard>
                         <CardContent>
                           <ParkingIcon color="primary" fontSize="large" />
@@ -676,7 +676,7 @@ const PropertyDetails = () => {
           </Grid>
 
           {/* Right Half - Description Only */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12 , md: 6 }}>
             <Slide direction="left" in timeout={1000}>
               <Box>
                 {/* Description matching left column height */}

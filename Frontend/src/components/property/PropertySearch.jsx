@@ -50,7 +50,7 @@ const PropertySearch = ({
       <SearchBoxContainer>
         {/* First Row - Main Search Fields */}
         <Grid container spacing={2.5} sx={{ mb: 2.5 }}>
-          <Grid item xs={12} md={6}>
+          <Grid size={{xs:12,md:6}}>
             <ElegantTextField
               fullWidth
               placeholder="Search by location, title..."
@@ -62,7 +62,7 @@ const PropertySearch = ({
             />
           </Grid>
           
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{xs:12,sm:6,md:3}}>
             <FormControl fullWidth>
               <ElegantInputLabel>City</ElegantInputLabel>
               <ElegantSelect
@@ -78,7 +78,7 @@ const PropertySearch = ({
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{xs:12,sm:6,md:3}}>
             <FormControl fullWidth>
               <ElegantInputLabel>Type</ElegantInputLabel>
               <ElegantSelect
@@ -97,7 +97,7 @@ const PropertySearch = ({
 
         {/* Second Row - Additional Filters */}
         <Grid container spacing={2.5}>
-          <Grid item xs={12} sm={6} md={2}>
+          <Grid size={{xs:12,sm:6,md:2}}>
             <FormControl fullWidth>
               <ElegantInputLabel>Subtype</ElegantInputLabel>
               <ElegantSelect
@@ -114,7 +114,7 @@ const PropertySearch = ({
             </FormControl>
           </Grid>
 
-          <Grid item xs={6} sm={3} md={1.5}>
+          <Grid size={{xs:6,sm:3,md:1.5}}>
             <FormControl fullWidth>
               <ElegantInputLabel>Baths</ElegantInputLabel>
               <ElegantSelect
@@ -132,7 +132,7 @@ const PropertySearch = ({
             </FormControl>
           </Grid>
 
-          <Grid item xs={6} sm={6} md={1.5}>
+          <Grid size={{xs:6,sm:6,md:1.5}}>
             <ElegantTextField
               fullWidth
               placeholder="Min Price (₹)"
@@ -142,7 +142,7 @@ const PropertySearch = ({
             />
           </Grid>
 
-          <Grid item xs={6} sm={6} md={1.5}>
+          <Grid size={{xs:6,sm:6,md:1.5}}>
             <ElegantTextField
               fullWidth
               placeholder="Max Price (₹)"
@@ -152,7 +152,7 @@ const PropertySearch = ({
             />
           </Grid>
 
-          <Grid item xs={6} sm={6} md={1.5}>
+          <Grid size={{xs:6,sm:6,md:1.5}}>
             <ElegantTextField
               fullWidth
               placeholder="Min Area (sq ft)"
@@ -162,7 +162,7 @@ const PropertySearch = ({
             />
           </Grid>
 
-          <Grid item xs={6} sm={6} md={1.5}>
+          <Grid size={{xs:6,sm:6,md:1.5}}>
             <ElegantTextField
               fullWidth
               placeholder="Max Area (sq ft)"
@@ -172,7 +172,7 @@ const PropertySearch = ({
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={1.5}>
+          <Grid size={{xs:12,sm:6,md:1.5}}>
             <Button
               variant="outlined"
               startIcon={<ClearIcon />}
