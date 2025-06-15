@@ -21,6 +21,8 @@ import {
   Link,
   Fade,
   Slide,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   LocationOn as LocationIcon,
@@ -39,6 +41,7 @@ import {
   Favorite as FavoriteIcon,
   ArrowBack as ArrowBackIcon,
   NavigateNext as NavigateNextIcon,
+  PhotoLibrary as GalleryIcon,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import api from '../../services/api';
@@ -52,14 +55,14 @@ import {
   parsePropertySlug
 } from './utils/PropertyUtils';
 
-// NEW: Import styled components from PropertyStyles.js instead of creating our own
+// Import styled components from PropertyStyles.js
 import {
   PropertyCard,
   PriceChip,
   StatsContainer,
 } from './styles/PropertyStyles';
 
-// NEW: Import centralized theme constants for additional styling
+// Import centralized theme constants
 import {
   BRAND_COLORS,
   SEMANTIC_COLORS,
@@ -69,15 +72,21 @@ import {
   Z_INDEX,
 } from '../../theme/constants';
 
-// Create additional styled components that follow PropertyStyles.js patterns
+// Hero Section with compact height
 const HeroSection = styled(Box)(({ theme }) => ({
   position: 'relative',
-  height: '60vh',
+  height: '40vh',
+  minHeight: '300px',
   overflow: 'hidden',
   borderRadius: BORDER_RADIUS['2xl'],
-  marginBottom: theme.spacing(4),
+  marginBottom: theme.spacing(3),
   cursor: 'pointer',
   boxShadow: SHADOWS.lg,
+  
+  [theme.breakpoints.down('md')]: {
+    height: '30vh',
+    minHeight: '250px',
+  },
 }));
 
 const HeroImage = styled('img')(({ theme }) => ({
@@ -115,20 +124,35 @@ const VerifiedBadge = styled(Box)(({ theme }) => ({
   boxShadow: SHADOWS.sm,
 }));
 
-// Use the same styling pattern as PropertyCard for consistency
+// Property detail cards
 const FeatureCard = styled(PropertyCard)(({ theme }) => ({
   textAlign: 'center',
-  // PropertyCard already has hover effects, shadows, etc.
+  height: '100%',
+  '& .MuiCardContent-root': {
+    padding: theme.spacing(2),
+    '&:last-child': {
+      paddingBottom: theme.spacing(2),
+    },
+  },
 }));
 
-// Enhanced contact card using centralized theme
+// Price section
+const PriceSection = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(3),
+  background: `linear-gradient(135deg, ${SEMANTIC_COLORS.success.main} 0%, ${SEMANTIC_COLORS.success.light} 100%)`,
+  color: 'white',
+  borderRadius: BORDER_RADIUS['2xl'],
+  textAlign: 'center',
+  boxShadow: SHADOWS.md,
+  marginBottom: theme.spacing(2),
+}));
+
+// Contact card
 const ContactCard = styled(Card)(({ theme }) => ({
   padding: theme.spacing(3),
   background: `linear-gradient(135deg, ${BRAND_COLORS.primary.main} 0%, ${BRAND_COLORS.primary.dark} 100%)`,
   color: 'white',
   borderRadius: BORDER_RADIUS['2xl'],
-  position: 'sticky',
-  top: theme.spacing(12),
   boxShadow: SHADOWS.lg,
   transition: `all ${TRANSITIONS.duration.normal} ${TRANSITIONS.easing.default}`,
   
@@ -138,17 +162,63 @@ const ContactCard = styled(Card)(({ theme }) => ({
   },
 }));
 
-// Enhanced price section using PriceChip styling patterns
-const PriceSection = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(3),
-  background: `linear-gradient(135deg, ${SEMANTIC_COLORS.success.main} 0%, ${SEMANTIC_COLORS.success.light} 100%)`,
-  color: 'white',
-  borderRadius: BORDER_RADIUS['2xl'],
-  textAlign: 'center',
-  boxShadow: SHADOWS.md,
+// Scrollable description container
+const ScrollableDescription = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: BORDER_RADIUS.xl,
+  maxHeight: '200px',
+  overflowY: 'auto',
+  marginBottom: theme.spacing(2),
+  backgroundColor: theme.palette.grey[50],
+  
+  '&::-webkit-scrollbar': {
+    width: '6px',
+  },
+  '&::-webkit-scrollbar-track': {
+    backgroundColor: theme.palette.grey[200],
+    borderRadius: '3px',
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: theme.palette.grey[400],
+    borderRadius: '3px',
+    '&:hover': {
+      backgroundColor: theme.palette.grey[600],
+    },
+  },
 }));
 
-// Enhanced action buttons following PropertyStyles.js patterns
+// Gallery container
+const GalleryContainer = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: BORDER_RADIUS.xl,
+  marginBottom: theme.spacing(2),
+  maxHeight: '300px',
+  overflowY: 'auto',
+  
+  '&::-webkit-scrollbar': {
+    width: '6px',
+  },
+  '&::-webkit-scrollbar-track': {
+    backgroundColor: theme.palette.grey[200],
+    borderRadius: '3px',
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: theme.palette.grey[400],
+    borderRadius: '3px',
+    '&:hover': {
+      backgroundColor: theme.palette.grey[600],
+    },
+  },
+}));
+
+// Features container
+const FeaturesContainer = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderRadius: BORDER_RADIUS.xl,
+  backgroundColor: theme.palette.grey[50],
+}));
+
+// Action buttons
 const ActionButton = styled(Button)(({ theme, variant = 'primary' }) => {
   const variants = {
     primary: {
@@ -185,6 +255,8 @@ const ActionButton = styled(Button)(({ theme, variant = 'primary' }) => {
 const PropertyDetails = () => {
   const { propertySlug } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   // State management
   const [property, setProperty] = useState(null);
@@ -204,7 +276,6 @@ const PropertyDetails = () => {
           throw new Error('Invalid property URL');
         }
         
-        // Fetch property details by slug
         const response = await api.properties.getBySlug(propertySlug);
         
         if (!response.success || !response.data) {
@@ -213,7 +284,6 @@ const PropertyDetails = () => {
         
         setProperty(response.data);
         
-        // Check if property is in favorites
         try {
           const favoriteResponse = await api.favorites.check(response.data.id);
           setIsFavorite(favoriteResponse.isFavorite || false);
@@ -239,13 +309,11 @@ const PropertyDetails = () => {
   const handleBackToListings = () => {
     const state = location.state;
     
-    // If we have a return URL from navigation state, use it
     if (state?.returnUrl) {
       navigate(state.returnUrl);
       return;
     }
     
-    // If we have URL referrer information, try to use it
     if (document.referrer && document.referrer.includes(window.location.origin)) {
       const referrerUrl = new URL(document.referrer);
       if (referrerUrl.pathname === '/' && referrerUrl.search) {
@@ -254,7 +322,6 @@ const PropertyDetails = () => {
       }
     }
     
-    // Fallback to home page
     navigate('/');
   };
 
@@ -284,9 +351,7 @@ const PropertyDetails = () => {
         console.log('Error sharing:', err);
       }
     } else {
-      // Fallback: copy URL to clipboard
       navigator.clipboard.writeText(window.location.href);
-      // You can add a toast notification here
     }
   };
 
@@ -312,15 +377,16 @@ const PropertyDetails = () => {
       <>
         <Navbar />
         <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-          <Skeleton variant="rectangular" height={400} sx={{ mb: 4, borderRadius: BORDER_RADIUS['2xl'] }} />
+          <Skeleton variant="text" height={80} sx={{ mb: 2 }} />
+          <Skeleton variant="rectangular" height={300} sx={{ mb: 3, borderRadius: BORDER_RADIUS['2xl'] }} />
           <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
-              <Skeleton variant="text" height={60} />
-              <Skeleton variant="text" height={30} />
-              <Skeleton variant="text" height={200} />
+            <Grid item xs={12} md={6}>
+              <Skeleton variant="rectangular" height={200} sx={{ mb: 2, borderRadius: BORDER_RADIUS.xl }} />
+              <Skeleton variant="rectangular" height={150} sx={{ borderRadius: BORDER_RADIUS.xl }} />
             </Grid>
-            <Grid item xs={12} md={4}>
-              <Skeleton variant="rectangular" height={300} sx={{ borderRadius: BORDER_RADIUS['2xl'] }} />
+            <Grid item xs={12} md={6}>
+              <Skeleton variant="rectangular" height={200} sx={{ mb: 2, borderRadius: BORDER_RADIUS.xl }} />
+              <Skeleton variant="rectangular" height={150} sx={{ borderRadius: BORDER_RADIUS.xl }} />
             </Grid>
           </Grid>
         </Container>
@@ -352,7 +418,6 @@ const PropertyDetails = () => {
   // Render property details
   return (
     <>
-      {/* Enhanced SEO for Property Details */}
       <PropertyDetailsSEO
         property={property}
         baseUrl={typeof window !== 'undefined' ? window.location.origin : ''}
@@ -362,7 +427,7 @@ const PropertyDetails = () => {
       
       <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
         {/* Breadcrumbs */}
-        <Breadcrumbs sx={{ mb: 3 }} separator={<NavigateNextIcon fontSize="small" />}>
+        <Breadcrumbs sx={{ mb: 2 }} separator={<NavigateNextIcon fontSize="small" />}>
           <Link 
             color="inherit" 
             href="/" 
@@ -392,6 +457,51 @@ const PropertyDetails = () => {
           Back to Properties
         </ActionButton>
 
+        {/* Property Header - Above Image */}
+        <Fade in timeout={600}>
+          <Box sx={{ mb: 3 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+              <Box>
+                <Typography variant="h3" component="h1" fontWeight="600" gutterBottom>
+                  {property.title}
+                </Typography>
+                <Box display="flex" alignItems="center" mb={1}>
+                  <LocationIcon color="action" sx={{ mr: 1 }} />
+                  <Typography variant="h6" color="text.secondary">
+                    {property.location}, {property.city}
+                  </Typography>
+                </Box>
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Chip 
+                    icon={<HomeIcon />} 
+                    label={property.subtype} 
+                    variant="outlined" 
+                    color="primary"
+                  />
+                  <Box display="flex" alignItems="center">
+                    <DateIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+                    <Typography variant="body1" color="text.secondary">
+                      Listed {new Date(property.datePosted).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+              
+              <Box display="flex" gap={1}>
+                <IconButton onClick={handleShareClick} color="primary">
+                  <ShareIcon />
+                </IconButton>
+                <IconButton 
+                  onClick={handleFavoriteClick} 
+                  color={isFavorite ? 'error' : 'default'}
+                >
+                  <FavoriteIcon />
+                </IconButton>
+              </Box>
+            </Box>
+          </Box>
+        </Fade>
+
         {/* Hero Image Section */}
         <Fade in timeout={800}>
           <HeroSection>
@@ -401,13 +511,11 @@ const PropertyDetails = () => {
               onClick={() => setSelectedImageIndex((selectedImageIndex + 1) % property.images.length)}
             />
             
-            {/* Property Status */}
             <PropertyStatusChip 
               label={property.status === 'available' ? 'Available' : property.status}
               color={property.status === 'available' ? 'success' : 'default'}
             />
             
-            {/* Verified Badge */}
             {property.verified && (
               <VerifiedBadge>
                 <VerifiedIcon fontSize="small" />
@@ -419,57 +527,19 @@ const PropertyDetails = () => {
           </HeroSection>
         </Fade>
 
-        <Grid container spacing={4}>
-          {/* Main Content */}
-          <Grid item xs={12} md={8}>
-            <Slide direction="up" in timeout={1000}>
+        {/* Content Below Image - Split Layout */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Left Half - Property Details, Price, Contact */}
+          <Grid item xs={12} md={6}>
+            <Slide direction="right" in timeout={1000}>
               <Box>
-                {/* Property Title and Actions */}
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
-                  <Box>
-                    <Typography variant="h3" component="h1" fontWeight="600" gutterBottom>
-                      {property.title}
-                    </Typography>
-                    <Box display="flex" alignItems="center" mb={2}>
-                      <LocationIcon color="action" sx={{ mr: 1 }} />
-                      <Typography variant="h6" color="text.secondary">
-                        {property.location}, {property.city}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  
-                  <Box display="flex" gap={1}>
-                    <IconButton onClick={handleShareClick} color="primary">
-                      <ShareIcon />
-                    </IconButton>
-                    <IconButton 
-                      onClick={handleFavoriteClick} 
-                      color={isFavorite ? 'error' : 'default'}
-                    >
-                      <FavoriteIcon />
-                    </IconButton>
-                  </Box>
-                </Box>
-
-                {/* Property Type and Date */}
-                <Box display="flex" alignItems="center" gap={2} mb={3}>
-                  <Chip 
-                    icon={<HomeIcon />} 
-                    label={property.subtype} 
-                    variant="outlined" 
-                    color="primary"
-                  />
-                  <Box display="flex" alignItems="center">
-                    <DateIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
-                    <Typography variant="body2" color="text.secondary">
-                      Listed {new Date(property.datePosted).toLocaleDateString()}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {/* Property Features Grid using FeatureCard from PropertyStyles pattern */}
-                <Grid container spacing={2} sx={{ mb: 4 }}>
-                  <Grid item xs={6} sm={3}>
+                {/* Property Details Grid */}
+                <Typography variant="h5" fontWeight="600" gutterBottom sx={{ mb: 2 }}>
+                  Property Details
+                </Typography>
+                
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={6}>
                     <FeatureCard>
                       <CardContent>
                         <AreaIcon color="primary" fontSize="large" />
@@ -484,7 +554,7 @@ const PropertyDetails = () => {
                   </Grid>
                   
                   {property.bedrooms !== undefined && (
-                    <Grid item xs={6} sm={3}>
+                    <Grid item xs={6}>
                       <FeatureCard>
                         <CardContent>
                           <BedIcon color="primary" fontSize="large" />
@@ -500,7 +570,7 @@ const PropertyDetails = () => {
                   )}
                   
                   {property.bathrooms && (
-                    <Grid item xs={6} sm={3}>
+                    <Grid item xs={6}>
                       <FeatureCard>
                         <CardContent>
                           <BathIcon color="primary" fontSize="large" />
@@ -516,7 +586,7 @@ const PropertyDetails = () => {
                   )}
                   
                   {property.parking && (
-                    <Grid item xs={6} sm={3}>
+                    <Grid item xs={6}>
                       <FeatureCard>
                         <CardContent>
                           <ParkingIcon color="primary" fontSize="large" />
@@ -532,68 +602,8 @@ const PropertyDetails = () => {
                   )}
                 </Grid>
 
-                {/* Description */}
-                <Paper sx={{ p: 3, mb: 4, borderRadius: BORDER_RADIUS['2xl'] }}>
-                  <Typography variant="h5" fontWeight="600" gutterBottom>
-                    Description
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" paragraph>
-                    {property.description}
-                  </Typography>
-                </Paper>
-
-                {/* Features using PriceChip-like styling */}
-                {property.features && property.features.length > 0 && (
-                  <Paper sx={{ p: 3, mb: 4, borderRadius: BORDER_RADIUS['2xl'] }}>
-                    <Typography variant="h5" fontWeight="600" gutterBottom>
-                      Property Features
-                    </Typography>
-                    <Box display="flex" flexWrap="wrap" gap={1}>
-                      {property.features.map((feature, index) => (
-                        <PriceChip
-                          key={index}
-                          label={feature}
-                          icon={<StarIcon />}
-                        />
-                      ))}
-                    </Box>
-                  </Paper>
-                )}
-
-                {/* Image Gallery */}
-                {property.images && property.images.length > 1 && (
-                  <Paper sx={{ p: 3, mb: 4, borderRadius: BORDER_RADIUS['2xl'] }}>
-                    <Typography variant="h5" fontWeight="600" gutterBottom>
-                      Gallery
-                    </Typography>
-                    <ImageList variant="masonry" cols={3} gap={8}>
-                      {property.images.map((image, index) => (
-                        <ImageListItem 
-                          key={index}
-                          onClick={() => setSelectedImageIndex(index)}
-                          sx={{ cursor: 'pointer' }}
-                        >
-                          <img
-                            src={image}
-                            alt={`${property.title} - Image ${index + 1}`}
-                            loading="lazy"
-                            style={{ borderRadius: BORDER_RADIUS.lg }}
-                          />
-                        </ImageListItem>
-                      ))}
-                    </ImageList>
-                  </Paper>
-                )}
-              </Box>
-            </Slide>
-          </Grid>
-
-          {/* Sidebar */}
-          <Grid item xs={12} md={4}>
-            <Slide direction="left" in timeout={1200}>
-              <Box>
                 {/* Price Section */}
-                <PriceSection sx={{ mb: 3 }}>
+                <PriceSection>
                   <Typography variant="h4" fontWeight="700" gutterBottom>
                     {formatPrice(property.price)}
                   </Typography>
@@ -613,7 +623,7 @@ const PropertyDetails = () => {
                         Contact Agent
                       </Typography>
                       <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Get property details
+                        Quick response guaranteed
                       </Typography>
                     </Box>
                   </Box>
@@ -664,7 +674,81 @@ const PropertyDetails = () => {
               </Box>
             </Slide>
           </Grid>
+
+          {/* Right Half - Description Only */}
+          <Grid item xs={12} md={6}>
+            <Slide direction="left" in timeout={1000}>
+              <Box>
+                {/* Description matching left column height */}
+                <Typography variant="h5" fontWeight="600" gutterBottom sx={{ mb: 2 }}>
+                  Description
+                </Typography>
+                <ScrollableDescription sx={{ 
+                  height: 'calc(100% - 40px)', // Match left column height minus title
+                  minHeight: '500px', // Ensure reasonable minimum height
+                  maxHeight: '600px', // Prevent excessive height
+                }}>
+                  <Typography variant="body1" color="text.secondary" lineHeight={1.6}>
+                    {property.description}
+                  </Typography>
+                </ScrollableDescription>
+              </Box>
+            </Slide>
+          </Grid>
         </Grid>
+
+        {/* Full Width Sections Below - Gallery and Features */}
+        <Slide direction="up" in timeout={1200}>
+          <Box>
+            {/* Gallery Section */}
+            {property.images && property.images.length > 1 && (
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="h5" fontWeight="600" gutterBottom>
+                  Gallery ({property.images.length} photos)
+                </Typography>
+                <GalleryContainer>
+                  <ImageList variant="masonry" cols={isMobile ? 2 : 4} gap={8}>
+                    {property.images.map((image, index) => (
+                      <ImageListItem 
+                        key={index}
+                        onClick={() => setSelectedImageIndex(index)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <img
+                          src={image}
+                          alt={`${property.title} - Image ${index + 1}`}
+                          loading="lazy"
+                          style={{ borderRadius: BORDER_RADIUS.lg }}
+                        />
+                      </ImageListItem>
+                    ))}
+                  </ImageList>
+                </GalleryContainer>
+              </Box>
+            )}
+
+            {/* Features Section */}
+            {property.features && property.features.length > 0 && (
+              <Box>
+                <Typography variant="h5" fontWeight="600" gutterBottom>
+                  Property Features
+                </Typography>
+                <FeaturesContainer>
+                  <Box display="flex" flexWrap="wrap" gap={1}>
+                    {property.features.map((feature, index) => (
+                      <PriceChip
+                        key={index}
+                        label={feature}
+                        icon={<StarIcon />}
+                        size="small"
+                      />
+                    ))}
+                  </Box>
+                </FeaturesContainer>
+              </Box>
+            )}
+          </Box>
+        </Slide>
       </Container>
     </>
   );
