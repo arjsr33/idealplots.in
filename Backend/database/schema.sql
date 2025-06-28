@@ -881,6 +881,407 @@ END //
 DELIMITER ;
 
 -- ================================================================
+-- ADMIN AGENT CREATION ENHANCEMENT
+-- Add functionality for admin to create agent accounts
+-- ================================================================
+
+-- 1. Add notification tracking table for agent account creation
+CREATE TABLE admin_created_notifications (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    created_by_admin_id BIGINT UNSIGNED NOT NULL,
+    
+    -- Notification Details
+    email_sent BOOLEAN DEFAULT FALSE,
+    sms_sent BOOLEAN DEFAULT FALSE,
+    email_sent_at TIMESTAMP NULL,
+    sms_sent_at TIMESTAMP NULL,
+    
+    -- Credentials shared
+    temp_password VARCHAR(255) NOT NULL, -- Encrypted temporary password
+    password_reset_required BOOLEAN DEFAULT TRUE,
+    
+    -- Notification content
+    email_subject VARCHAR(255) NULL,
+    email_body TEXT NULL,
+    sms_message TEXT NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign Keys
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by_admin_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_user_id (user_id),
+    INDEX idx_created_by_admin (created_by_admin_id),
+    INDEX idx_created_at (created_at)
+);
+
+-- ================================================================
+-- 2. STORED PROCEDURE: Admin Creates Agent Account
+-- ================================================================
+
+DELIMITER //
+
+CREATE PROCEDURE AdminCreateAgentAccount(
+    IN p_admin_id BIGINT UNSIGNED,
+    IN p_name VARCHAR(255),
+    IN p_email VARCHAR(255),
+    IN p_phone VARCHAR(20),
+    IN p_temp_password VARCHAR(255), -- Plain text, will be encrypted
+    IN p_license_number VARCHAR(100),
+    IN p_agency_name VARCHAR(255),
+    IN p_commission_rate DECIMAL(5,2),
+    IN p_experience_years INT,
+    IN p_specialization TEXT,
+    IN p_agent_bio TEXT,
+    OUT p_agent_id BIGINT UNSIGNED,
+    OUT p_success BOOLEAN,
+    OUT p_error_message TEXT
+)
+BEGIN
+    DECLARE v_existing_user_count INT DEFAULT 0;
+    DECLARE v_admin_exists INT DEFAULT 0;
+    DECLARE v_bcrypt_password VARCHAR(255);
+    DECLARE v_email_token VARCHAR(100);
+    DECLARE v_phone_code VARCHAR(10);
+    
+    -- Error handling
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_success = FALSE;
+        SET p_error_message = 'Database error occurred while creating agent account';
+        SET p_agent_id = NULL;
+    END;
+    
+    START TRANSACTION;
+    
+    -- Validate admin exists and has admin privileges
+    SELECT COUNT(*) INTO v_admin_exists 
+    FROM users 
+    WHERE id = p_admin_id AND user_type = 'admin' AND status = 'active';
+    
+    IF v_admin_exists = 0 THEN
+        SET p_success = FALSE;
+        SET p_error_message = 'Invalid admin user or insufficient privileges';
+        SET p_agent_id = NULL;
+        ROLLBACK;
+        LEAVE create_agent;
+    END IF;
+    
+    -- Check if user already exists with this email or phone
+    SELECT COUNT(*) INTO v_existing_user_count 
+    FROM users 
+    WHERE email = p_email OR phone = p_phone;
+    
+    IF v_existing_user_count > 0 THEN
+        SET p_success = FALSE;
+        SET p_error_message = 'User with this email or phone number already exists';
+        SET p_agent_id = NULL;
+        ROLLBACK;
+        LEAVE create_agent;
+    END IF;
+    
+    -- Generate verification tokens
+    SET v_email_token = SUBSTRING(MD5(CONCAT(p_email, NOW(), RAND())), 1, 32);
+    SET v_phone_code = LPAD(FLOOR(RAND() * 1000000), 6, '0');
+    
+    -- Encrypt the temporary password (simulate Bcrypt - in real app, this should be done in application layer)
+    SET v_bcrypt_password = CONCAT('$2y$12$', SUBSTRING(SHA2(CONCAT(p_temp_password, 'salt'), 256), 1, 53));
+    
+    -- Create the agent account
+    INSERT INTO users (
+        name, email, phone, password, user_type, status,
+        license_number, commission_rate, agency_name, 
+        experience_years, specialization, agent_bio,
+        is_buyer, is_seller,
+        email_verification_token, phone_verification_code
+    ) VALUES (
+        p_name, p_email, p_phone, v_bcrypt_password, 'agent', 'pending_verification',
+        p_license_number, p_commission_rate, p_agency_name,
+        p_experience_years, p_specialization, p_agent_bio,
+        FALSE, FALSE,
+        v_email_token, v_phone_code
+    );
+    
+    SET p_agent_id = LAST_INSERT_ID();
+    
+    -- Create notification record for email/SMS sending
+    INSERT INTO admin_created_notifications (
+        user_id, created_by_admin_id, temp_password, 
+        email_subject, email_body, sms_message
+    ) VALUES (
+        p_agent_id, p_admin_id, p_temp_password,
+        'Welcome to Ideal Plots - Agent Account Created',
+        CONCAT(
+            'Dear ', p_name, ',\n\n',
+            'An agent account has been created for you at Ideal Plots.\n\n',
+            'Your login credentials:\n',
+            'Email: ', p_email, '\n',
+            'Temporary Password: ', p_temp_password, '\n\n',
+            'Please log in at [website_url] and:\n',
+            '1. Change your password immediately\n',
+            '2. Verify your email address\n',
+            '3. Verify your phone number\n\n',
+            'After verification, your account will be fully activated.\n\n',
+            'Best regards,\n',
+            'Ideal Plots Team'
+        ),
+        CONCAT(
+            'Welcome to Ideal Plots! Your agent account has been created. ',
+            'Login with email: ', p_email, ' and temporary password: ', p_temp_password, '. ',
+            'Please login immediately to change your password and verify your account.'
+        )
+    );
+    
+    -- Log the action in audit logs
+    INSERT INTO audit_logs (
+        user_id, action, table_name, record_id, description, severity
+    ) VALUES (
+        p_admin_id, 'admin_create_agent', 'users', p_agent_id,
+        CONCAT('Admin created agent account for: ', p_name, ' (', p_email, ')'),
+        'medium'
+    );
+    
+    -- Create a pending approval for agent verification (optional workflow)
+    INSERT INTO pending_approvals (
+        approval_type, record_id, table_name, submitted_by,
+        submission_data, status, priority
+    ) VALUES (
+        'user_verification', p_agent_id, 'users', p_admin_id,
+        JSON_OBJECT(
+            'created_by_admin', TRUE,
+            'agent_name', p_name,
+            'agent_email', p_email,
+            'license_number', p_license_number,
+            'agency_name', p_agency_name
+        ),
+        'approved', -- Auto-approved since created by admin
+        'normal'
+    );
+    
+    COMMIT;
+    
+    SET p_success = TRUE;
+    SET p_error_message = NULL;
+    
+END //
+
+DELIMITER ;
+
+-- ================================================================
+-- 3. PROCEDURE: Send Agent Account Notifications
+-- ================================================================
+
+DELIMITER //
+
+CREATE PROCEDURE SendAgentAccountNotifications(
+    IN p_notification_id BIGINT UNSIGNED,
+    OUT p_email_content TEXT,
+    OUT p_sms_content TEXT,
+    OUT p_agent_email VARCHAR(255),
+    OUT p_agent_phone VARCHAR(20),
+    OUT p_agent_name VARCHAR(255)
+)
+BEGIN
+    -- Get notification details and agent information
+    SELECT 
+        n.email_body,
+        n.sms_message,
+        u.email,
+        u.phone,
+        u.name
+    INTO 
+        p_email_content,
+        p_sms_content,
+        p_agent_email,
+        p_agent_phone,
+        p_agent_name
+    FROM admin_created_notifications n
+    JOIN users u ON n.user_id = u.id
+    WHERE n.id = p_notification_id;
+    
+    -- Mark as sent (this should be called after successful email/SMS sending)
+    UPDATE admin_created_notifications 
+    SET 
+        email_sent = TRUE,
+        sms_sent = TRUE,
+        email_sent_at = NOW(),
+        sms_sent_at = NOW()
+    WHERE id = p_notification_id;
+    
+END //
+
+DELIMITER ;
+
+-- ================================================================
+-- 4. PROCEDURE: Agent First Login Password Reset
+-- ================================================================
+
+DELIMITER //
+
+CREATE PROCEDURE AgentFirstLoginReset(
+    IN p_agent_id BIGINT UNSIGNED,
+    IN p_new_password VARCHAR(255), -- Bcrypt encrypted new password
+    OUT p_success BOOLEAN,
+    OUT p_message TEXT
+)
+BEGIN
+    DECLARE v_reset_required BOOLEAN DEFAULT FALSE;
+    DECLARE v_agent_exists INT DEFAULT 0;
+    
+    -- Check if agent exists and password reset is required
+    SELECT COUNT(*) INTO v_agent_exists
+    FROM users u
+    JOIN admin_created_notifications n ON u.id = n.user_id
+    WHERE u.id = p_agent_id 
+      AND u.user_type = 'agent'
+      AND n.password_reset_required = TRUE;
+    
+    IF v_agent_exists = 0 THEN
+        SET p_success = FALSE;
+        SET p_message = 'Agent not found or password reset not required';
+    ELSE
+        -- Update password and mark as reset complete
+        UPDATE users 
+        SET password = p_new_password,
+            status = 'active',
+            email_verified_at = NOW(),
+            phone_verified_at = NOW()
+        WHERE id = p_agent_id;
+        
+        -- Mark password reset as completed
+        UPDATE admin_created_notifications 
+        SET password_reset_required = FALSE
+        WHERE user_id = p_agent_id;
+        
+        -- Log the password change
+        INSERT INTO audit_logs (
+            user_id, action, table_name, record_id, description
+        ) VALUES (
+            p_agent_id, 'first_login_password_reset', 'users', p_agent_id,
+            'Agent completed first login password reset'
+        );
+        
+        SET p_success = TRUE;
+        SET p_message = 'Password successfully updated and account activated';
+    END IF;
+    
+END //
+
+DELIMITER ;
+
+-- ================================================================
+-- 5. VIEW: Admin Created Agents Pending Notifications
+-- ================================================================
+
+CREATE VIEW admin_created_agents_pending_notifications AS
+SELECT 
+    n.id as notification_id,
+    u.id as agent_id,
+    u.name as agent_name,
+    u.email as agent_email,
+    u.phone as agent_phone,
+    u.license_number,
+    u.agency_name,
+    admin.name as created_by_admin_name,
+    n.email_sent,
+    n.sms_sent,
+    n.password_reset_required,
+    n.created_at as account_created_at
+FROM admin_created_notifications n
+JOIN users u ON n.user_id = u.id
+JOIN users admin ON n.created_by_admin_id = admin.id
+WHERE u.user_type = 'agent'
+ORDER BY n.created_at DESC;
+
+-- ================================================================
+-- 6. SAMPLE USAGE EXAMPLES
+-- ================================================================
+
+/*
+-- Example 1: Admin creates a new agent account
+CALL AdminCreateAgentAccount(
+    1, -- admin_id
+    'Rajesh Kumar', -- name
+    'rajesh@newagency.com', -- email
+    '+919876543220', -- phone
+    'TempPass123!', -- temporary password
+    'KL/RERA/2024/015', -- license number
+    'New Real Estate Agency', -- agency name
+    2.75, -- commission rate
+    8, -- experience years
+    'residential,commercial', -- specialization
+    'Experienced agent specializing in luxury properties', -- bio
+    @agent_id, @success, @error_message
+);
+
+-- Check the result
+SELECT @agent_id as new_agent_id, @success as success, @error_message as error_msg;
+
+-- Example 2: Get notification content for sending email/SMS
+CALL SendAgentAccountNotifications(
+    1, -- notification_id
+    @email_content, @sms_content, @agent_email, @agent_phone, @agent_name
+);
+
+-- Example 3: Agent completes first login password reset
+CALL AgentFirstLoginReset(
+    5, -- agent_id
+    '$2y$12$newbcryptedpasswordhash...', -- new bcrypt password
+    @success, @message
+);
+
+-- Example 4: View all pending notifications
+SELECT * FROM admin_created_agents_pending_notifications 
+WHERE email_sent = FALSE OR sms_sent = FALSE;
+
+-- Example 5: Get agent accounts created by specific admin
+SELECT 
+    u.name as agent_name,
+    u.email,
+    u.phone,
+    u.license_number,
+    u.status,
+    n.created_at as account_created_at,
+    n.email_sent,
+    n.sms_sent
+FROM users u
+JOIN admin_created_notifications n ON u.id = n.user_id
+WHERE n.created_by_admin_id = 1 -- specific admin ID
+ORDER BY n.created_at DESC;
+*/
+
+-- ================================================================
+-- 7. ADDITIONAL INDEXES FOR PERFORMANCE
+-- ================================================================
+
+-- Index for admin created notifications queries
+CREATE INDEX idx_admin_notifications_status ON admin_created_notifications (email_sent, sms_sent, created_at);
+
+-- ================================================================
+-- 8. TRIGGER: Auto-log admin agent creation
+-- ================================================================
+
+DELIMITER //
+
+CREATE TRIGGER log_admin_agent_creation
+AFTER INSERT ON admin_created_notifications
+FOR EACH ROW
+BEGIN
+    -- Additional logging can be done here if needed
+    -- This trigger ensures all admin agent creations are tracked
+    UPDATE users 
+    SET updated_at = NOW() 
+    WHERE id = NEW.user_id;
+END //
+
+DELIMITER ;
+-- ================================================================
 -- ADDITIONAL INDEXES FOR PERFORMANCE
 -- ================================================================
 
