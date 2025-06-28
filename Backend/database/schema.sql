@@ -1,14 +1,11 @@
 -- ================================================================
 -- IMPROVED PROPERTY WEBSITE DATABASE SCHEMA
 -- Enhanced User System & Account Integration
+-- Fixed for Docker MySQL setup with idealplots_local database
 -- ================================================================
 
--- Create database
-CREATE DATABASE IF NOT EXISTS property_website 
-CHARACTER SET utf8mb4 
-COLLATE utf8mb4_unicode_ci;
-
-USE property_website;
+-- Use the existing database (created by Docker)
+USE idealplots_local;
 
 -- ================================================================
 -- 1. ENHANCED USERS TABLE (Buyers & Sellers with Bcrypt)
@@ -78,9 +75,6 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
     
-    -- Foreign Keys
-    FOREIGN KEY (preferred_agent_id) REFERENCES users(id) ON DELETE SET NULL,
-    
     -- Indexes
     INDEX idx_email (email),
     INDEX idx_phone (phone),
@@ -99,6 +93,10 @@ CREATE TABLE users (
         (user_type = 'agent' AND license_number IS NOT NULL)
     )
 );
+
+-- Add foreign key constraint after table creation
+ALTER TABLE users ADD CONSTRAINT fk_users_preferred_agent 
+FOREIGN KEY (preferred_agent_id) REFERENCES users(id) ON DELETE SET NULL;
 
 -- ================================================================
 -- 2. PROPERTY LISTINGS TABLE (Same as before, enhanced)
@@ -283,7 +281,7 @@ CREATE TABLE user_favorites (
 
 CREATE TABLE enquiries (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    ticket_number VARCHAR(50) UNIQUE NOT NULL,
+    ticket_number VARCHAR(50) UNIQUE NOT NULL DEFAULT (CONCAT('TKT-', YEAR(NOW()), MONTH(NOW()), DAY(NOW()), '-', LPAD(CONNECTION_ID(), 6, '0'))),
     
     -- User Account Integration
     user_id BIGINT UNSIGNED NULL, -- Links to user account (if they have one)
@@ -374,14 +372,11 @@ CREATE TABLE user_agent_assignments (
     INDEX idx_user_id (user_id),
     INDEX idx_agent_id (agent_id),
     INDEX idx_status (status),
-    INDEX idx_assigned_at (assigned_at),
-    
-    -- Ensure one active assignment per user
-    UNIQUE KEY unique_active_assignment (user_id, status, agent_id)
+    INDEX idx_assigned_at (assigned_at)
 );
 
 -- ================================================================
--- 7. PROPERTY IMAGES TABLE (Same as before)
+-- 7. PROPERTY IMAGES TABLE
 -- ================================================================
 
 CREATE TABLE property_images (
@@ -416,7 +411,7 @@ CREATE TABLE property_images (
 );
 
 -- ================================================================
--- 8. ENQUIRY NOTES TABLE (Enhanced)
+-- 8. ENQUIRY NOTES TABLE
 -- ================================================================
 
 CREATE TABLE enquiry_notes (
@@ -449,7 +444,7 @@ CREATE TABLE enquiry_notes (
 );
 
 -- ================================================================
--- 9. PROPERTY VIEWS TABLE (Enhanced with User Tracking)
+-- 9. PROPERTY VIEWS TABLE
 -- ================================================================
 
 CREATE TABLE property_views (
@@ -485,7 +480,7 @@ CREATE TABLE property_views (
 );
 
 -- ================================================================
--- 10. SYSTEM SETTINGS TABLE (Same as before)
+-- 10. SYSTEM SETTINGS TABLE
 -- ================================================================
 
 CREATE TABLE system_settings (
@@ -506,7 +501,7 @@ CREATE TABLE system_settings (
 );
 
 -- ================================================================
--- 11. AUDIT LOGS TABLE (Enhanced)
+-- 11. AUDIT LOGS TABLE
 -- ================================================================
 
 CREATE TABLE audit_logs (
@@ -619,7 +614,7 @@ INSERT INTO system_settings (setting_key, setting_value, setting_type, descripti
 ('offer_account_creation_on_enquiry', 'true', 'boolean', 'Offer account creation during enquiry', true);
 
 -- ================================================================
--- ENHANCED VIEWS
+-- VIEWS
 -- ================================================================
 
 -- Active properties with complete user details
@@ -683,7 +678,7 @@ WHERE u.user_type = 'user'
 GROUP BY u.id;
 
 -- ================================================================
--- ENHANCED TRIGGERS
+-- TRIGGERS
 -- ================================================================
 
 DELIMITER //
@@ -732,46 +727,10 @@ BEGIN
     WHERE id = OLD.property_id;
 END //
 
--- Auto-assign agent to new users based on preferences
-CREATE TRIGGER auto_assign_agent_to_user
-AFTER UPDATE ON users
-FOR EACH ROW
-BEGIN
-    DECLARE agent_id BIGINT UNSIGNED;
-    
-    -- Only for buyers who just got verified and don't have an agent
-    IF NEW.is_buyer = TRUE 
-       AND NEW.email_verified_at IS NOT NULL 
-       AND OLD.email_verified_at IS NULL
-       AND NEW.preferred_agent_id IS NULL
-       AND (SELECT setting_value FROM system_settings WHERE setting_key = 'auto_assign_agents') = 'true'
-    THEN
-        -- Find best agent based on user preferences and agent performance
-        SELECT u.id INTO agent_id
-        FROM users u
-        WHERE u.user_type = 'agent' 
-          AND u.status = 'active'
-          AND (u.specialization IS NULL OR FIND_IN_SET('residential', u.specialization) > 0)
-        ORDER BY u.agent_rating DESC, u.total_sales DESC
-        LIMIT 1;
-        
-        -- Assign the agent
-        IF agent_id IS NOT NULL THEN
-            UPDATE users SET preferred_agent_id = agent_id WHERE id = NEW.id;
-            
-            INSERT INTO user_agent_assignments (
-                user_id, agent_id, assignment_type, assignment_reason
-            ) VALUES (
-                NEW.id, agent_id, 'auto', 'Auto-assigned based on preferences and agent performance'
-            );
-        END IF;
-    END IF;
-END //
-
 DELIMITER ;
 
 -- ================================================================
--- ENHANCED STORED PROCEDURES
+-- STORED PROCEDURES
 -- ================================================================
 
 DELIMITER //
@@ -843,8 +802,6 @@ CREATE PROCEDURE ApprovePropertyListing(
     IN p_notes TEXT
 )
 BEGIN
-    DECLARE v_approval_id BIGINT UNSIGNED;
-    
     -- Update property status
     UPDATE property_listings 
     SET status = 'active', 
@@ -933,10 +890,9 @@ CREATE INDEX idx_user_preferences ON users (preferred_cities(100), preferred_pro
 
 -- Indexes for admin panel
 CREATE INDEX idx_pending_approvals_admin ON pending_approvals (status, approval_type, created_at);
-CREATE INDEX idx_properties_pending ON property_listings (status, created_at) WHERE status = 'pending_review';
 
 -- Indexes for agent assignment
-CREATE INDEX idx_agent_performance ON users (user_type, agent_rating, total_sales) WHERE user_type = 'agent';
+CREATE INDEX idx_agent_performance ON users (user_type, agent_rating, total_sales);
 
 -- Indexes for favorites and recommendations
 CREATE INDEX idx_favorites_user_property ON user_favorites (user_id, property_id, created_at);
@@ -972,10 +928,11 @@ INSERT INTO users (
 
 -- Insert sample property listing
 INSERT INTO property_listings (
-    owner_id, title, description, property_type, price, area,
+    listing_id, owner_id, title, description, property_type, price, area,
     city, location, bedrooms, bathrooms, parking, furnished,
     main_image, status
 ) VALUES (
+    'PL-2025-001',
     3, -- Ravi Kumar as owner
     'Modern 3BHK Apartment in Kochi',
     'Beautiful apartment with sea view, modern amenities, and great connectivity. Perfect for families.',
@@ -1020,10 +977,73 @@ INSERT INTO user_agent_assignments (
 );
 
 -- ================================================================
--- USEFUL QUERIES FOR APPLICATION
+-- ADDITIONAL MISSING SECTIONS FROM ORIGINAL
+-- ================================================================
+
+-- Auto-assign agent to new users based on preferences (FIXED VERSION)
+DELIMITER //
+CREATE TRIGGER auto_assign_agent_to_user
+AFTER UPDATE ON users
+FOR EACH ROW
+BEGIN
+    DECLARE agent_id BIGINT UNSIGNED;
+    DECLARE auto_assign_setting VARCHAR(10) DEFAULT 'false';
+    
+    -- Get the auto-assign setting
+    SELECT setting_value INTO auto_assign_setting 
+    FROM system_settings 
+    WHERE setting_key = 'auto_assign_agents' 
+    LIMIT 1;
+    
+    -- Only for buyers who just got verified and don't have an agent
+    IF NEW.is_buyer = TRUE 
+       AND NEW.email_verified_at IS NOT NULL 
+       AND (OLD.email_verified_at IS NULL OR OLD.email_verified_at != NEW.email_verified_at)
+       AND NEW.preferred_agent_id IS NULL
+       AND auto_assign_setting = 'true'
+    THEN
+        -- Find best agent based on user preferences and agent performance
+        SELECT u.id INTO agent_id
+        FROM users u
+        WHERE u.user_type = 'agent' 
+          AND u.status = 'active'
+          AND (u.specialization IS NULL OR FIND_IN_SET('residential', u.specialization) > 0)
+        ORDER BY u.agent_rating DESC, u.total_sales DESC
+        LIMIT 1;
+        
+        -- Assign the agent if found
+        IF agent_id IS NOT NULL THEN
+            UPDATE users SET preferred_agent_id = agent_id WHERE id = NEW.id;
+            
+            INSERT INTO user_agent_assignments (
+                user_id, agent_id, assignment_type, assignment_reason
+            ) VALUES (
+                NEW.id, agent_id, 'auto', 'Auto-assigned based on preferences and agent performance'
+            );
+        END IF;
+    END IF;
+END //
+DELIMITER ;
+
+-- ================================================================
+-- MISSING INDEXES FOR BETTER PERFORMANCE
+-- ================================================================
+
+-- Additional index that was in original
+CREATE INDEX idx_properties_pending ON property_listings (status, created_at);
+
+-- Add unique constraint for active agent assignments (was missing proper syntax)
+-- Note: MySQL doesn't support filtered unique indexes, so we handle this at application level
+
+-- ================================================================
+-- ADDITIONAL USEFUL QUERIES SECTION (Documentation)
 -- ================================================================
 
 /*
+-- ================================================================
+-- USEFUL QUERIES FOR APPLICATION DEVELOPMENT
+-- ================================================================
+
 -- Get user dashboard data
 SELECT * FROM user_dashboard_view WHERE id = ?;
 
@@ -1063,61 +1083,116 @@ LEFT JOIN user_agent_assignments uaa ON u.id = uaa.agent_id AND uaa.status = 'ac
 WHERE u.user_type = 'agent' AND u.status = 'active'
 GROUP BY u.id
 ORDER BY u.agent_rating DESC;
-*/
+
+-- Advanced property search with filters
+SELECT pl.*, u.name as owner_name, u.phone as owner_phone,
+       (SELECT COUNT(*) FROM user_favorites uf WHERE uf.property_id = pl.id) as total_favorites,
+       (SELECT COUNT(*) FROM property_views pv WHERE pv.property_id = pl.id) as total_views
+FROM property_listings pl
+LEFT JOIN users u ON pl.owner_id = u.id
+WHERE pl.status = 'active' 
+  AND pl.deleted_at IS NULL
+  AND pl.city IN (?, ?, ?)  -- Dynamic city filter
+  AND pl.price BETWEEN ? AND ?  -- Price range
+  AND (? = '' OR pl.property_type = ?)  -- Property type filter
+  AND (? = 0 OR pl.bedrooms >= ?)  -- Bedroom filter
+ORDER BY pl.is_featured DESC, pl.created_at DESC
+LIMIT ? OFFSET ?;
+
+-- Get property details with all related data
+SELECT pl.*,
+       owner.name as owner_name, owner.email as owner_email, owner.phone as owner_phone,
+       agent.name as agent_name, agent.email as agent_email, agent.phone as agent_phone,
+       (SELECT COUNT(*) FROM user_favorites uf WHERE uf.property_id = pl.id) as favorites_count,
+       (SELECT COUNT(*) FROM property_views pv WHERE pv.property_id = pl.id AND pv.viewed_at > DATE_SUB(NOW(), INTERVAL 30 DAY)) as views_last_30_days,
+       (SELECT COUNT(*) FROM enquiries e WHERE e.property_id = pl.id) as total_enquiries
+FROM property_listings pl
+LEFT JOIN users owner ON pl.owner_id = owner.id
+LEFT JOIN users agent ON pl.assigned_agent_id = agent.id
+WHERE pl.id = ? AND pl.status = 'active' AND pl.deleted_at IS NULL;
+
+-- Get similar properties for recommendations
+SELECT pl2.*, 
+       ABS(pl2.price - ?) as price_diff,
+       (CASE WHEN pl2.city = ? THEN 1 ELSE 0 END) as same_city,
+       (CASE WHEN pl2.property_type = ? THEN 1 ELSE 0 END) as same_type
+FROM property_listings pl2
+WHERE pl2.id != ?
+  AND pl2.status = 'active' 
+  AND pl2.deleted_at IS NULL
+  AND (pl2.city = ? OR pl2.property_type = ?)
+ORDER BY same_city DESC, same_type DESC, price_diff ASC
+LIMIT 6;
 
 -- ================================================================
 -- SECURITY & PERFORMANCE RECOMMENDATIONS
 -- ================================================================
 
-/*
 SECURITY ENHANCEMENTS:
 
 1. Password Management:
    - All passwords MUST be Bcrypt encrypted with cost 12+
-   - Implement password reset functionality
-   - Add password history to prevent reuse
-   - Force password changes for security breaches
+   - Implement password reset functionality with secure tokens
+   - Add password history to prevent reuse of last 5 passwords
+   - Force password changes after security breaches
+   - Implement password strength requirements
 
 2. Account Verification:
    - Email verification required before account activation
    - Phone OTP verification for sensitive operations
    - Two-factor authentication for agents and admins
+   - Account lockout after failed login attempts
 
 3. Access Control:
    - Role-based permissions at application level
-   - Rate limiting on login attempts
-   - Session management and timeout
+   - Rate limiting on login attempts (5 attempts per 15 minutes)
+   - Session management with secure tokens and timeout
    - IP-based restrictions for admin accounts
+   - CORS configuration for frontend access
 
 4. Data Protection:
    - Encrypt sensitive personal data at rest
    - Audit all data access and modifications
    - Regular security audits and penetration testing
    - GDPR compliance for user data handling
+   - Secure file upload validation and storage
 
 PERFORMANCE OPTIMIZATIONS:
 
 1. Database Optimization:
    - Regular ANALYZE TABLE on all tables
-   - Monitor slow query log
+   - Monitor slow query log (queries > 2 seconds)
    - Implement read replicas for heavy read operations
-   - Archive old audit logs and property views
+   - Archive old audit logs (older than 1 year)
+   - Archive old property views (older than 6 months)
+   - Optimize JSON column queries with generated columns
 
 2. Caching Strategy:
-   - Cache frequently accessed property listings
+   - Cache frequently accessed property listings (Redis)
    - Cache user preferences and recommendations
-   - Implement Redis for session management
-   - Cache search results and filters
+   - Implement session storage in Redis
+   - Cache search results and filters (5-minute TTL)
+   - Cache system settings and configuration
 
 3. File Management:
-   - Store property images on CDN
+   - Store property images on CDN (CloudFlare/AWS)
    - Implement image compression and optimization
    - Use lazy loading for property galleries
    - Regular cleanup of unused images
+   - Implement image resizing for different screen sizes
 
-4. Monitoring:
-   - Set up alerts for failed logins
+4. Monitoring & Alerts:
+   - Set up alerts for failed logins (>10 in 5 minutes)
    - Monitor database performance metrics
    - Track user engagement and conversion rates
-   - Monitor system resource usage
+   - Monitor system resource usage (CPU, Memory, Disk)
+   - Set up uptime monitoring for critical endpoints
+
+5. Backup Strategy:
+   - Daily automated database backups
+   - Weekly full system backups
+   - Monthly backup restoration tests
+   - Backup rotation (keep daily for 30 days, weekly for 3 months)
+   - Offsite backup storage for disaster recovery
+
 */

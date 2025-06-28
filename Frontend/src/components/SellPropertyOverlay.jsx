@@ -822,7 +822,7 @@ const SellPropertyOverlay = ({ open, onClose }) => {
           </IconButton>
         </Box>
       </ResponsiveDialogTitle>
-      
+      <br/>
       <ResponsiveDialogContent>
         {!submitSuccess ? (
           <Box>
