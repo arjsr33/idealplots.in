@@ -1,27 +1,30 @@
 // ================================================================
-// BACKEND/DATABASE/DBCONNECTION.JS - DATABASE CONNECTION MANAGER
-// Centralized MySQL database connection with connection pooling
+// BACKEND/DATABASE/CONNECTION.JS - SMART DATABASE CONNECTION MANAGER
+// Centralized MySQL database connection with Docker/Hostinger support
 // ================================================================
 
 const mysql = require('mysql2/promise');
 const path = require('path');
 
 // ================================================================
-// DATABASE CONFIGURATION
+// ENVIRONMENT-AWARE DATABASE CONFIGURATION
 // ================================================================
+
+const isProduction = process.env.NODE_ENV === 'production';
+const isHostinger = isProduction; // Hostinger is our production environment
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 3306,
+  port: parseInt(process.env.DB_PORT) || 3306,
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'real_estate',
   
-  // Connection pool settings
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
+  // Environment-specific connection pool settings
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || (isProduction ? 10 : 5),
   queueLimit: parseInt(process.env.DB_QUEUE_LIMIT) || 0,
-  acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 60000,
-  timeout: parseInt(process.env.DB_TIMEOUT) || 60000,
+  acquireTimeout: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || (isProduction ? 60000 : 30000),
+  timeout: parseInt(process.env.DB_TIMEOUT) || (isProduction ? 60000 : 30000),
   
   // MySQL-specific settings
   charset: 'utf8mb4',
@@ -29,22 +32,34 @@ const dbConfig = {
   
   // Connection behavior
   reconnect: true,
-  idleTimeout: 300000, // 5 minutes
+  idleTimeout: isProduction ? 300000 : 180000, // 5 min prod, 3 min dev
   maxReconnects: 10,
   
-  // SSL configuration (for production)
-  ssl: process.env.NODE_ENV === 'production' ? {
-    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
+  // SSL configuration (Hostinger production)
+  ssl: isHostinger && process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' ? {
+    rejectUnauthorized: true
   } : false,
   
   // Additional options
   supportBigNumbers: true,
   bigNumberStrings: true,
   dateStrings: false,
-  debug: process.env.NODE_ENV === 'development' && process.env.DB_DEBUG === 'true',
+  debug: process.env.DB_DEBUG === 'true',
   
   // SQL mode for strict data validation
-  sql_mode: 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'
+  sql_mode: 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO',
+  
+  // Production optimizations
+  typeCast: true,
+  flags: isProduction ? [
+    'COMPRESS',
+    'PROTOCOL_41', 
+    'TRANSACTIONS',
+    'RESERVED',
+    'SECURE_CONNECTION',
+    'MULTI_STATEMENTS',
+    'MULTI_RESULTS'
+  ] : undefined
 };
 
 // ================================================================
@@ -62,18 +77,23 @@ const createPool = () => {
     
     // Pool event handlers
     pool.on('connection', (connection) => {
-      console.log(`✅ New database connection established: ${connection.threadId}`);
+      const env = isProduction ? 'PRODUCTION (Hostinger)' : 'DEVELOPMENT (Docker)';
+      console.log(`✅ New database connection established: ${connection.threadId} [${env}]`);
       connectionAttempts = 0; // Reset attempts on successful connection
     });
     
     pool.on('error', (err) => {
-      console.error('❌ Database pool error:', err);
+      console.error('❌ Database pool error:', err.message);
       
       if (err.code === 'PROTOCOL_CONNECTION_LOST') {
         console.log('🔄 Database connection lost, attempting to reconnect...');
         handleDisconnect();
       } else {
-        throw err;
+        console.error('❌ Unhandled database error:', err);
+        // Don't throw in production to avoid crashes
+        if (!isProduction) {
+          throw err;
+        }
       }
     });
     
@@ -89,7 +109,10 @@ const createPool = () => {
       }
     });
     
-    console.log('📊 Database connection pool created successfully');
+    const env = isProduction ? 'PRODUCTION (Hostinger)' : 'DEVELOPMENT (Docker)';
+    console.log(`📊 Database connection pool created successfully [${env}]`);
+    console.log(`🔗 Connected to: ${dbConfig.user}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
+    
     return pool;
     
   } catch (error) {
@@ -103,8 +126,18 @@ const handleDisconnect = () => {
   connectionAttempts++;
   
   if (connectionAttempts > maxConnectionAttempts) {
-    console.error(`❌ Maximum connection attempts (${maxConnectionAttempts}) reached. Giving up.`);
-    process.exit(1);
+    console.error(`❌ Maximum connection attempts (${maxConnectionAttempts}) reached.`);
+    if (isProduction) {
+      // In production, try to restart gracefully
+      console.log('🔄 Attempting to restart database pool...');
+      setTimeout(() => {
+        pool = null;
+        createPool();
+      }, 10000); // Wait 10 seconds before restart
+    } else {
+      process.exit(1);
+    }
+    return;
   }
   
   console.log(`🔄 Reconnection attempt ${connectionAttempts}/${maxConnectionAttempts}`);
@@ -133,7 +166,8 @@ createPool();
 const getConnection = async () => {
   try {
     if (!pool) {
-      throw new Error('Database pool not initialized');
+      console.log('🔄 Pool not initialized, creating new pool...');
+      createPool();
     }
     
     const connection = await pool.getConnection();
@@ -144,7 +178,17 @@ const getConnection = async () => {
     
     return connection;
   } catch (error) {
-    console.error('❌ Error getting database connection:', error);
+    console.error('❌ Error getting database connection:', error.message);
+    
+    // Handle connection pool exhaustion
+    if (error.code === 'POOL_CLOSED' || error.code === 'POOL_ENQUEUE_TIMEOUT') {
+      console.log('🔄 Pool issue detected, recreating pool...');
+      pool = null;
+      createPool();
+      // Retry once
+      return await pool.getConnection();
+    }
+    
     throw error;
   }
 };
@@ -171,15 +215,24 @@ const executeQuery = async (query, params = [], options = {}) => {
       console.warn(`⚠️ Slow query detected (${executionTime}ms):`, query.substring(0, 100) + '...');
     }
     
+    // Log database operations if enabled
+    if (process.env.DB_LOG === 'true') {
+      logDatabaseOperation('query_executed', {
+        query: query.substring(0, 100) + '...',
+        executionTime,
+        rowsAffected: results.affectedRows || results.length
+      });
+    }
+    
     return results;
     
   } catch (error) {
     console.error('❌ Database query error:', {
       query: query.substring(0, 100) + '...',
-      params: params,
+      params: params.length > 0 ? '[' + params.length + ' params]' : 'no params',
       error: error.message
     });
-    throw error;
+    throw handleDatabaseError(error, 'executeQuery');
   } finally {
     if (connection) {
       connection.release();
@@ -199,9 +252,19 @@ const executeTransaction = async (callback) => {
     connection = await getConnection();
     await connection.beginTransaction();
     
+    const startTime = Date.now();
     const result = await callback(connection);
+    const executionTime = Date.now() - startTime;
     
     await connection.commit();
+    
+    if (process.env.DB_LOG === 'true') {
+      logDatabaseOperation('transaction_completed', {
+        executionTime,
+        success: true
+      });
+    }
+    
     return result;
     
   } catch (error) {
@@ -214,8 +277,8 @@ const executeTransaction = async (callback) => {
       }
     }
     
-    console.error('❌ Transaction error:', error);
-    throw error;
+    console.error('❌ Transaction error:', error.message);
+    throw handleDatabaseError(error, 'executeTransaction');
   } finally {
     if (connection) {
       connection.release();
@@ -243,12 +306,24 @@ const executeStoredProcedure = async (procedureName, params = []) => {
 const testConnection = async () => {
   try {
     const connection = await getConnection();
-    const [results] = await connection.execute('SELECT 1 as test');
+    const [results] = await connection.execute('SELECT 1 as test, NOW() as timestamp, DATABASE() as db_name');
     connection.release();
     
-    return results && results[0] && results[0].test === 1;
+    const isConnected = results && results[0] && results[0].test === 1;
+    
+    if (isConnected) {
+      const env = isProduction ? 'PRODUCTION' : 'DEVELOPMENT';
+      console.log(`✅ Database connection test passed [${env}]:`, {
+        database: results[0].db_name,
+        timestamp: results[0].timestamp,
+        host: dbConfig.host,
+        port: dbConfig.port
+      });
+    }
+    
+    return isConnected;
   } catch (error) {
-    console.error('❌ Database connection test failed:', error);
+    console.error('❌ Database connection test failed:', error.message);
     return false;
   }
 };
@@ -262,13 +337,27 @@ const getPoolStatus = () => {
     return { status: 'not_initialized' };
   }
   
-  return {
-    status: 'active',
-    totalConnections: pool.pool._allConnections.length,
-    freeConnections: pool.pool._freeConnections.length,
-    acquiredConnections: pool.pool._acquiredConnections.length,
-    queuedRequests: pool.pool._connectionQueue.length
-  };
+  try {
+    return {
+      status: 'active',
+      environment: isProduction ? 'production' : 'development',
+      totalConnections: pool.pool._allConnections.length,
+      freeConnections: pool.pool._freeConnections.length,
+      acquiredConnections: pool.pool._acquiredConnections.length,
+      queuedRequests: pool.pool._connectionQueue.length,
+      config: {
+        host: dbConfig.host,
+        port: dbConfig.port,
+        database: dbConfig.database,
+        connectionLimit: dbConfig.connectionLimit
+      }
+    };
+  } catch (error) {
+    return { 
+      status: 'error', 
+      error: error.message 
+    };
+  }
 };
 
 /**
@@ -278,8 +367,9 @@ const getPoolStatus = () => {
 const closeAllConnections = async () => {
   try {
     if (pool) {
+      console.log('📴 Closing database connection pool...');
       await pool.end();
-      console.log('📊 Database connection pool closed');
+      console.log('✅ Database connection pool closed successfully');
       pool = null;
     }
   } catch (error) {
@@ -289,7 +379,7 @@ const closeAllConnections = async () => {
 };
 
 // ================================================================
-// QUERY BUILDERS AND HELPERS
+// QUERY BUILDERS AND HELPERS (Keep your existing functions)
 // ================================================================
 
 /**
@@ -366,7 +456,7 @@ const logDatabaseOperation = (operation, details) => {
 };
 
 /**
- * Handle database errors
+ * Handle database errors with environment-aware responses
  * @param {Error} error - Database error
  * @param {string} context - Error context
  * @returns {Error} Processed error
@@ -377,10 +467,20 @@ const handleDatabaseError = (error, context = '') => {
     errno: error.errno,
     sqlState: error.sqlState,
     sqlMessage: error.sqlMessage,
-    context
+    context,
+    environment: isProduction ? 'production' : 'development'
   };
   
-  console.error('❌ Database Error:', errorDetails);
+  // Log full details in development, limited in production
+  if (isProduction) {
+    console.error('❌ Database Error:', {
+      code: error.code,
+      context,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    console.error('❌ Database Error:', errorDetails);
+  }
   
   // Map specific database errors to user-friendly messages
   switch (error.code) {
@@ -399,8 +499,14 @@ const handleDatabaseError = (error, context = '') => {
     case 'ER_BAD_NULL_ERROR':
       error.userMessage = 'Required field is missing';
       break;
+    case 'ECONNREFUSED':
+      error.userMessage = 'Cannot connect to database';
+      break;
+    case 'ER_ACCESS_DENIED_ERROR':
+      error.userMessage = 'Database access denied';
+      break;
     default:
-      error.userMessage = 'Database operation failed';
+      error.userMessage = isProduction ? 'Database operation failed' : error.message;
   }
   
   return error;
@@ -435,5 +541,9 @@ module.exports = {
   pool: () => pool,
   
   // Configuration
-  dbConfig
+  dbConfig,
+  
+  // Environment info
+  isProduction,
+  isHostinger
 };

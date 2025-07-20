@@ -11,7 +11,7 @@ const {
   buildPaginationQuery,
   handleDatabaseError,
   logDatabaseOperation
-} = require('../database/dbConnection');
+} = require('../database/connection');
 
 const { 
   comparePassword,

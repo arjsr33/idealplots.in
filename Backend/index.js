@@ -12,8 +12,11 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Load environment variables
-dotenv.config();
+// 🔄 CHANGE 1: Smart environment loading
+const envFile = process.env.NODE_ENV === 'production' 
+  ? '.env.production' 
+  : '.env.development';
+dotenv.config({ path: envFile });
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -29,6 +32,11 @@ const enquiryRoutes = require('./routes/enquiries');
 
 // Initialize Express app
 const app = express();
+
+// 🔄 CHANGE 2: Trust proxy for production (Hostinger)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // ================================================================
 // SECURITY & MIDDLEWARE CONFIGURATION
@@ -53,7 +61,8 @@ const corsOptions = {
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
       'http://localhost:3000',
       'http://localhost:3001',
-      'https://yourdomain.com'
+      'http://localhost:5173',
+      'https://idealplots.in'
     ];
     
     // Allow requests with no origin (mobile apps, etc.)
@@ -143,7 +152,8 @@ app.get('/health', (req, res) => {
 // Database health check
 app.get('/health/db', async (req, res) => {
   try {
-    const { testConnection } = require('./database/dbConnection');
+    // 🔄 CHANGE 3: Updated database connection import
+    const { testConnection } = require('./database/connection');
     const isConnected = await testConnection();
     
     if (isConnected) {
@@ -182,22 +192,27 @@ app.use('/api/admin', authenticateToken, adminLimiter, adminRoutes);
 app.use('/api/agents', authenticateToken, agentRoutes);
 
 // ================================================================
-// STATIC FILE SERVING (FOR UPLOADS)
+// STATIC FILE SERVING (ENVIRONMENT AWARE)
 // ================================================================
 
+// 🔄 CHANGE 4: Smart upload path based on environment
+const uploadsPath = process.env.NODE_ENV === 'production'
+  ? '/home/username/public_html/uploads'  // Hostinger path
+  : path.join(__dirname, 'uploads');      // Development path
+
 // Serve uploaded files (with proper security)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-  maxAge: '1d',
+app.use('/uploads', express.static(uploadsPath, {
+  maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
   etag: true,
   lastModified: true,
-  setHeaders: (res, path) => {
+  setHeaders: (res, filePath) => {
     // Security headers for file serving
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('X-Frame-Options', 'DENY');
     
     // Only allow specific file types
     const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx'];
-    const ext = path.toLowerCase().substring(path.lastIndexOf('.'));
+    const ext = path.extname(filePath).toLowerCase();
     
     if (!allowedExtensions.includes(ext)) {
       res.status(403).end();
@@ -234,8 +249,8 @@ const gracefulShutdown = (signal) => {
   server.close(() => {
     console.log('HTTP server closed.');
     
-    // Close database connections
-    const { closeAllConnections } = require('./database/dbConnection');
+    // 🔄 CHANGE 5: Updated database connection import
+    const { closeAllConnections } = require('./database/connection');
     closeAllConnections()
       .then(() => {
         console.log('Database connections closed.');
@@ -258,24 +273,26 @@ const gracefulShutdown = (signal) => {
 // SERVER STARTUP
 // ================================================================
 
-const PORT = process.env.PORT || 5000;
+// Updated default port for Hostinger
+const PORT = process.env.PORT || 3000;  // Changed from 5000 to 3000
 const HOST = process.env.HOST || '0.0.0.0';
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════════╗
 ║                    REAL ESTATE BACKEND                        ║
-║                        SERVER STARTED                         ║
+║                   ${(process.env.NODE_ENV || 'development').toUpperCase()} MODE                           ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ Environment: ${(process.env.NODE_ENV || 'development').padEnd(44)} ║
 ║ Server URL:  http://${HOST}:${PORT}${' '.repeat(31 - HOST.length - PORT.toString().length)} ║
 ║ Health URL:  http://${HOST}:${PORT}/health${' '.repeat(23 - HOST.length - PORT.toString().length)} ║
 ║ API Base:    http://${HOST}:${PORT}/api${' '.repeat(26 - HOST.length - PORT.toString().length)} ║
+║ Upload Path: ${uploadsPath.substring(0, 44).padEnd(44)} ║
 ╚════════════════════════════════════════════════════════════════╝
   `);
   
   // Test database connection on startup
-  const { testConnection } = require('./database/dbConnection');
+  const { testConnection } = require('./database/connection');
   testConnection()
     .then((isConnected) => {
       if (isConnected) {

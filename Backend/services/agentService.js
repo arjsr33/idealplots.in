@@ -12,7 +12,7 @@ const {
   buildSearchConditions,
   handleDatabaseError,
   logDatabaseOperation
-} = require('../database/dbConnection');
+} = require('../database/connection');
 
 const { 
   hashPassword, 
